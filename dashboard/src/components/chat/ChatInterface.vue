@@ -395,11 +395,11 @@ const puedeResponder = computed(() => {
 
 // Métodos
 const refreshConversaciones = async () => {
-  await chat.fetchConversaciones()
+  await chat.inicializar()
 }
 
 const seleccionarConversacion = async (conversacion: ChatSession) => {
-  await chat.seleccionarConversacion(conversacion.id)
+  await chat.seleccionarConversacion(conversacion)
   scrollToBottom()
 }
 
@@ -412,7 +412,7 @@ const enviarMensaje = async () => {
   await chat.enviarMensaje(
     chat.conversacionActiva.value.id,
     nuevoMensaje.value.trim(),
-    ejecutivoId
+    'ejecutivo'
   )
 
   nuevoMensaje.value = ''
@@ -428,13 +428,15 @@ const asignarEjecutivo = async (ejecutivoId: string) => {
 const cerrarConversacion = async () => {
   if (!chat.conversacionActiva.value) return
 
-  await chat.cerrarConversacion(chat.conversacionActiva.value.id)
+  // TODO: Implementar cerrarConversacion en useChat
+  console.log('🔄 Función cerrarConversacion no implementada aún')
 }
 
 const manejarEscritura = () => {
   if (!chat.conversacionActiva.value) return
   
-  chat.iniciarEscritura(chat.conversacionActiva.value.id, 'ejecutivo_current')
+  // TODO: Implementar iniciarEscritura en useChat
+  console.log('🔄 Función iniciarEscritura no implementada aún')
 }
 
 const scrollToBottom = async () => {

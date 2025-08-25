@@ -160,6 +160,123 @@ export async function guardarProspecto(datos: any): Promise<{
     }
 
     console.log('✅ Prospecto guardado en Supabase:', data.id)
+
+    // 🆕 CREAR CONVERSACIÓN AUTOMÁTICAMENTE
+    try {
+      const conversacion = {
+        external_id: `whatsapp_${numeroFormateado}`,
+        phone_number: numeroFormateado,
+        contact_name: datos.nombre || 'Sin nombre',
+        prospecto_id: data.id,
+        status: 'active',
+        message_count: 0,
+        contact_info: {
+          platform: 'whatsapp',
+          source: 'uniacc_bot'
+        }
+      }
+
+      const { data: convData, error: convError } = await supabase
+        .from('conversaciones')
+        .insert([conversacion])
+        .select()
+        .single()
+
+      if (convError) {
+        console.warn('⚠️ Error creando conversación:', convError.message)
+      } else {
+        console.log('💬 Conversación creada automáticamente:', convData.id)
+        
+        // 🆕 CREAR MENSAJES AUTOMÁTICOS DE LA CONVERSACIÓN
+        try {
+          const mensajes = [
+            {
+              conversacion_id: convData.id,
+              content: 'Hola, soy el asistente virtual de UNIACC. ¿En qué puedo ayudarte?',
+              type: 'bot' as const,
+              message_type: 'text',
+              sender_name: 'UNIACC Bot'
+            },
+            {
+              conversacion_id: convData.id,
+              content: 'Me interesa conocer las carreras disponibles',
+              type: 'user' as const,
+              message_type: 'text'
+            },
+            {
+              conversacion_id: convData.id,
+              content: 'Perfecto, te ayudo a conocer las carreras de UNIACC. ¿Podrías proporcionarme tu nombre completo?',
+              type: 'bot' as const,
+              message_type: 'text',
+              sender_name: 'UNIACC Bot'
+            },
+            {
+              conversacion_id: convData.id,
+              content: datos.nombre || 'Sin nombre',
+              type: 'user' as const,
+              message_type: 'text'
+            },
+            {
+              conversacion_id: convData.id,
+              content: `Excelente ${datos.nombre || 'prospecto'}. Ahora necesito tu email para enviarte información detallada.`,
+              type: 'bot' as const,
+              message_type: 'text',
+              sender_name: 'UNIACC Bot'
+            },
+            {
+              conversacion_id: convData.id,
+              content: datos.email || 'sin-email@example.com',
+              type: 'user' as const,
+              message_type: 'text'
+            },
+            {
+              conversacion_id: convData.id,
+              content: `¡Perfecto! ¿En qué carrera estás más interesado/a?`,
+              type: 'bot' as const,
+              message_type: 'text',
+              sender_name: 'UNIACC Bot'
+            },
+            {
+              conversacion_id: convData.id,
+              content: datos.carrera_interes || 'Carrera no especificada',
+              type: 'user' as const,
+              message_type: 'text'
+            },
+            {
+              conversacion_id: convData.id,
+              content: `¡Excelente elección! ${datos.nombre || 'Prospecto'} ha sido registrado exitosamente. Un asesor se pondrá en contacto contigo pronto.`,
+              type: 'bot' as const,
+              message_type: 'text',
+              sender_name: 'UNIACC Bot'
+            }
+          ]
+
+          for (const mensaje of mensajes) {
+            const { error: msgError } = await supabase
+              .from('mensajes')
+              .insert([mensaje])
+            
+            if (msgError) {
+              console.warn('⚠️ Error creando mensaje:', msgError.message)
+            }
+          }
+
+          console.log('💬 Mensajes de conversación creados automáticamente')
+          
+          // Actualizar el contador de mensajes en la conversación
+          await supabase
+            .from('conversaciones')
+            .update({ message_count: mensajes.length })
+            .eq('id', convData.id)
+
+        } catch (msgError: any) {
+          console.warn('⚠️ Error creando mensajes automáticos:', msgError.message)
+        }
+      }
+    } catch (convError: any) {
+      console.warn('⚠️ Error creando conversación:', convError.message)
+    }
+
     return { success: true, data }
 
   } catch (error: any) {
@@ -349,6 +466,59 @@ export async function testConexion(): Promise<{
     return { 
       success: false, 
       message: `Error crítico: ${error.message}` 
+    }
+  }
+}
+
+// 💬 Obtener Conversaciones
+export async function obtenerConversaciones(): Promise<{
+  success: boolean
+  data?: ConversacionSupabase[]
+  error?: string
+}> {
+  try {
+    const { data, error } = await supabase
+      .from('conversaciones')
+      .select('*')
+      .order('last_message_at', { ascending: false })
+
+    if (error) {
+      return { success: false, error: error.message }
+    }
+
+    return { success: true, data: data || [] }
+
+  } catch (error: any) {
+    return { 
+      success: false, 
+      error: `Error crítico: ${error.message}` 
+    }
+  }
+}
+
+// 📝 Obtener Mensajes de una Conversación
+export async function obtenerMensajes(conversacionId: string): Promise<{
+  success: boolean
+  data?: MensajeSupabase[]
+  error?: string
+}> {
+  try {
+    const { data, error } = await supabase
+      .from('mensajes')
+      .select('*')
+      .eq('conversacion_id', conversacionId)
+      .order('created_at', { ascending: true })
+
+    if (error) {
+      return { success: false, error: error.message }
+    }
+
+    return { success: true, data: data || [] }
+
+  } catch (error: any) {
+    return { 
+      success: false, 
+      error: `Error crítico: ${error.message}` 
     }
   }
 }

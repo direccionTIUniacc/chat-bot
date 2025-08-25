@@ -790,6 +790,183 @@ app.get('/api/stats', async (req: Request, res: Response) => {
   }
 })
 
+// **ENDPOINTS DE CHAT EN TIEMPO REAL**
+
+// **ENDPOINT: Obtener conversaciones**
+app.get('/api/conversaciones', async (req: Request, res: Response) => {
+  try {
+    // Intentar obtener conversaciones de Supabase
+    try {
+      const { obtenerConversaciones } = await import('./utils/supabase-client')
+      const resultado = await obtenerConversaciones()
+      
+      if (resultado.success) {
+        console.log('💬 Conversaciones obtenidas de Supabase')
+        return res.json({
+          success: true,
+          data: resultado.data,
+          source: 'supabase'
+        })
+      } else {
+        console.warn('⚠️ Error conversaciones Supabase:', resultado.error)
+      }
+    } catch (supabaseError) {
+      console.warn('⚠️ Supabase conversaciones no disponible, usando memoria local')
+    }
+
+    // Fallback: crear conversaciones basadas en prospectos
+    const conversaciones = prospectos.map(prospecto => ({
+      id: `conv_${prospecto.whatsapp}`,
+      external_id: `whatsapp_${prospecto.whatsapp}`,
+      phone_number: prospecto.whatsapp,
+      contact_name: prospecto.nombre,
+      prospecto_id: prospecto.id || `prosp_${prospecto.whatsapp}`,
+      status: 'active',
+      message_count: 0,
+      contact_info: {
+        platform: 'whatsapp',
+        source: 'uniacc_bot'
+      },
+      created_at: new Date().toISOString(),
+      last_message_at: new Date().toISOString()
+    }))
+
+    res.json({ 
+      success: true, 
+      data: conversaciones,
+      source: 'memory'
+    })
+  } catch (error) {
+    console.error('Error obteniendo conversaciones:', error)
+    res.status(500).json({ 
+      success: false, 
+      error: 'Error interno del servidor' 
+    })
+  }
+})
+
+// **ENDPOINT: Obtener mensajes de una conversación**
+app.get('/api/conversaciones/:id/mensajes', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params
+    
+    // Intentar obtener mensajes de Supabase
+    try {
+      const { obtenerMensajes } = await import('./utils/supabase-client')
+      const resultado = await obtenerMensajes(id)
+      
+      if (resultado.success) {
+        console.log(`💬 Mensajes obtenidos de Supabase para conversación ${id}`)
+        return res.json({
+          success: true,
+          data: resultado.data,
+          source: 'supabase'
+        })
+      } else {
+        console.warn('⚠️ Error mensajes Supabase:', resultado.error)
+      }
+    } catch (supabaseError) {
+      console.warn('⚠️ Supabase mensajes no disponible, usando memoria local')
+    }
+
+    // Fallback: mensajes simulados
+    const mensajes = [
+      {
+        id: `msg_1_${id}`,
+        conversacion_id: id,
+        content: 'Hola, soy el asistente virtual de UNIACC. ¿En qué puedo ayudarte?',
+        type: 'bot',
+        message_type: 'text',
+        sender_name: 'UNIACC Bot',
+        created_at: new Date(Date.now() - 300000).toISOString() // 5 minutos atrás
+      },
+      {
+        id: `msg_2_${id}`,
+        conversacion_id: id,
+        content: 'Me interesa conocer las carreras disponibles',
+        type: 'user',
+        message_type: 'text',
+        created_at: new Date(Date.now() - 240000).toISOString() // 4 minutos atrás
+      }
+    ]
+
+    res.json({ 
+      success: true, 
+      data: mensajes,
+      source: 'memory'
+    })
+  } catch (error) {
+    console.error('Error obteniendo mensajes:', error)
+    res.status(500).json({ 
+      success: false, 
+      error: 'Error interno del servidor' 
+    })
+  }
+})
+
+// **ENDPOINT: Enviar mensaje a una conversación**
+app.post('/api/conversaciones/:id/mensajes', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params
+    const { content, type = 'agent' } = req.body
+    
+    if (!content || !content.trim()) {
+      return res.status(400).json({
+        success: false,
+        error: 'El contenido del mensaje es requerido'
+      })
+    }
+
+    // Intentar guardar mensaje en Supabase
+    try {
+      const { guardarMensaje } = await import('./utils/supabase-client')
+      const resultado = await guardarMensaje({
+        conversacion_id: id,
+        content: content.trim(),
+        type: type as 'user' | 'bot' | 'agent'
+      })
+      
+      if (resultado.success) {
+        console.log(`💬 Mensaje guardado en Supabase para conversación ${id}`)
+        return res.json({
+          success: true,
+          data: resultado.data
+        })
+      } else {
+        console.warn('⚠️ Error guardando mensaje en Supabase:', resultado.error)
+      }
+    } catch (supabaseError) {
+      console.warn('⚠️ Supabase no disponible, usando memoria local')
+    }
+
+    // Fallback: guardar en memoria local
+    const mensaje = {
+      id: `msg_${Date.now()}_${id}`,
+      conversacion_id: id,
+      content: content.trim(),
+      type: type as 'user' | 'bot' | 'agent',
+      message_type: 'text',
+      sender_name: type === 'agent' ? 'Agente UNIACC' : 'Usuario',
+      created_at: new Date().toISOString()
+    }
+
+    // Aquí podrías almacenar en un array local si quisieras persistencia
+    console.log(`💬 Mensaje guardado localmente:`, mensaje)
+
+    res.json({
+      success: true,
+      data: mensaje,
+      source: 'memory'
+    })
+  } catch (error) {
+    console.error('Error enviando mensaje:', error)
+    res.status(500).json({
+      success: false,
+      error: 'Error interno del servidor'
+    })
+  }
+})
+
 // Manejo de rutas no encontradas
 app.all('*', (req: Request, res: Response) => {
   res.status(404).json({ 

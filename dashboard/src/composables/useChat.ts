@@ -43,31 +43,27 @@ export function useChat() {
     Object.values(mensajesNoLeidos.value).reduce((sum, count) => sum + count, 0)
   )
 
-  // Inicializar datos (carga desde Supabase o datos vacíos)
+  // Inicializar datos (carga desde la API del chatbot)
   const inicializar = async (): Promise<ApiResponse<boolean>> => {
     try {
       loading.value = true
       error.value = null
 
-      // Intentar cargar desde Supabase
-      const { data: conversacionesData, error: conversacionesError } = await supabase
-        .from('conversaciones')
-        .select(`
-          *,
-          prospecto:prospectos(*),
-          ejecutivo:ejecutivos(*)
-        `)
-        .order('last_message_at', { ascending: false })
+      // Cargar conversaciones desde el chatbot
+      const response = await fetch('http://localhost:3001/api/conversaciones')
+      const result = await response.json()
 
-      if (!conversacionesError && conversacionesData) {
-        conversaciones.value = conversacionesData
+      if (result.success && result.data) {
+        conversaciones.value = result.data
+        console.log('✅ Conversaciones cargadas desde chatbot:', result.data.length)
       } else {
-        // Si no hay datos o hay error, usar array vacío
+        console.error('❌ Error cargando conversaciones:', result.error)
         conversaciones.value = []
       }
 
       return handleSupabaseSuccess(true)
     } catch (err) {
+      console.error('❌ Error de conexión con chatbot:', err)
       error.value = 'Error inicializando chat'
       conversaciones.value = []
       return handleSupabaseError(err)
@@ -83,18 +79,16 @@ export function useChat() {
         return handleSupabaseSuccess(mensajes.value[sessionId])
       }
 
-      // Intentar cargar desde Supabase
-      const { data, error } = await supabase
-        .from('mensajes')
-        .select('*')
-        .eq('session_id', sessionId)
-        .order('timestamp', { ascending: true })
+      // Cargar mensajes desde el chatbot
+      const response = await fetch(`http://localhost:3001/api/conversaciones/${sessionId}/mensajes`)
+      const result = await response.json()
 
-      if (!error && data) {
-        mensajes.value[sessionId] = data
-        return handleSupabaseSuccess(data)
+      if (result.success && result.data) {
+        mensajes.value[sessionId] = result.data
+        console.log(`✅ Mensajes cargados para conversación ${sessionId}:`, result.data.length)
+        return handleSupabaseSuccess(result.data)
       } else {
-        // Si no hay datos, usar array vacío
+        console.error('❌ Error cargando mensajes:', result.error)
         mensajes.value[sessionId] = []
         return handleSupabaseSuccess([])
       }
@@ -162,12 +156,16 @@ export function useChat() {
   }
 
   const getContactName = (conversacion: ChatSession): string => {
+    // 🆕 Mapear campos del chatbot
+    if ((conversacion as any).contact_name) {
+      return (conversacion as any).contact_name
+    }
     // Intentar obtener nombre del prospecto si está relacionado
     if ((conversacion as any).prospecto?.nombre) {
       return (conversacion as any).prospecto.nombre
     }
-    // Fallback al external_contact_id o phone number
-    return (conversacion as any).contact_phone_number || (conversacion as any).external_contact_id || 'Usuario sin nombre'
+    // Fallback al phone_number o external_id
+    return (conversacion as any).phone_number || (conversacion as any).external_id || 'Usuario sin nombre'
   }
 
   const getEjecutivoNombre = (ejecutivoId: string): string => {
@@ -227,6 +225,13 @@ export function useChat() {
     // Para testing
     setConversacionActiva: (conversacion: ChatSession | null) => {
       conversacionActiva.value = conversacion
+    },
+
+    // 🆕 MÉTODO QUE FALTABA
+    seleccionarConversacion: (conversacion: ChatSession) => {
+      conversacionActiva.value = conversacion
+      // Cargar mensajes de la conversación seleccionada
+      obtenerMensajes(conversacion.id)
     }
   }
 }

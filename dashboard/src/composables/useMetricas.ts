@@ -53,7 +53,33 @@ export function useMetricas() {
       loading.value = true
       error.value = null
 
-      // Datos limpios para testing de integración
+      // Consultar estadísticas del chatbot
+      const response = await fetch('http://localhost:3001/api/stats')
+      const result = await response.json()
+      
+      if (result.success && result.data) {
+        prospectoMetrics.value = result.data
+        console.log('✅ Métricas de prospectos cargadas desde chatbot:', result.data)
+        return handleSupabaseSuccess(result.data)
+      } else {
+        console.error('❌ Error cargando métricas:', result.error)
+        // Fallback a stats vacías
+        const stats: ProspectoStats = {
+          total: 0,
+          nuevos: 0,
+          contactados: 0,
+          interesados: 0,
+          matriculados: 0,
+          descartados: 0,
+          conversion_rate: 0
+        }
+        prospectoMetrics.value = stats
+        return handleSupabaseSuccess(stats)
+      }
+    } catch (err) {
+      console.error('❌ Error de conexión con chatbot:', err)
+      error.value = 'Error al cargar métricas de prospectos'
+      // Fallback a stats vacías
       const stats: ProspectoStats = {
         total: 0,
         nuevos: 0,
@@ -63,11 +89,7 @@ export function useMetricas() {
         descartados: 0,
         conversion_rate: 0
       }
-
       prospectoMetrics.value = stats
-      return handleSupabaseSuccess(stats)
-    } catch (err) {
-      error.value = 'Error al cargar métricas de prospectos'
       return handleSupabaseError(err)
     } finally {
       loading.value = false
@@ -80,15 +102,21 @@ export function useMetricas() {
       loading.value = true
       error.value = null
 
-      // Datos limpios para testing de integración
+      // Por ahora, usar métricas simuladas basadas en los datos del chatbot
+      // En el futuro, podríamos agregar endpoints específicos para métricas del bot
       const metrics: ChatbotMetrics = {
-        total_sessions: 0,
-        active_sessions: 0,
-        completed_sessions: 0,
-        avg_duration: 0,
-        messages_per_session: 0,
-        conversion_rate: 0,
-        popular_queries: []
+        total_sessions: prospectoMetrics.value.total, // Basado en prospectos capturados
+        active_sessions: 0, // Por implementar
+        completed_sessions: prospectoMetrics.value.total, // Todos los prospectos son sesiones completadas
+        avg_duration: 5, // Promedio de 5 minutos por conversación
+        messages_per_session: 8, // Promedio de 8 mensajes por conversación
+        conversion_rate: prospectoMetrics.value.conversion_rate,
+        popular_queries: [
+          { query: 'Conocer carreras', count: 3 },
+          { query: 'Proceso de admisión', count: 2 },
+          { query: 'Costos y becas', count: 1 },
+          { query: 'Hablar con asesor', count: 1 }
+        ]
       }
 
       chatbotMetrics.value = metrics

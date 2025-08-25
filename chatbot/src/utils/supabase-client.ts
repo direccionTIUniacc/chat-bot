@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
+import { toZonedTime, formatInTimeZone } from 'date-fns-tz'
 
 // Configuración de Supabase
 const supabaseUrl = process.env.SUPABASE_URL!
@@ -10,6 +11,19 @@ if (!supabaseUrl || !supabaseKey) {
 }
 
 export const supabase = createClient(supabaseUrl, supabaseKey)
+
+// 🕐 FUNCIÓN HELPER: Obtener fecha/hora en zona horaria de Chile
+function getChileTime(): string {
+  const now = new Date()
+  const chileTime = toZonedTime(now, 'America/Santiago')
+  return chileTime.toISOString()
+}
+
+// 🕐 FUNCIÓN HELPER: Formatear fecha para mostrar en Chile
+function formatChileTime(date: Date | string): string {
+  const dateObj = typeof date === 'string' ? new Date(date) : date
+  return formatInTimeZone(dateObj, 'America/Santiago', 'yyyy-MM-dd HH:mm:ss')
+}
 
 // Función para formatear WhatsApp según la validación de la BD
 function formatearWhatsapp(numero: string): string {
@@ -138,15 +152,16 @@ export async function guardarProspecto(datos: any): Promise<{
       pais: 'Chile',
       region: datos.region || undefined,
       ciudad: datos.ciudad || undefined,
-      metadata: {
-        source: 'uniacc_chatbot',
-        bot_version: '1.0.0',
-        timestamp: new Date().toISOString(),
-        ...datos.datos_adicionales
-      }
+             metadata: {
+         source: 'uniacc_chatbot',
+         bot_version: '1.0.0',
+         timestamp: getChileTime(), // 🕐 Usar hora de Chile
+         ...datos.datos_adicionales
+       }
     }
 
-    console.log('💾 Insertando prospecto en Supabase:', prospecto.nombre)
+         console.log('💾 Insertando prospecto en Supabase:', prospecto.nombre)
+     console.log('🕐 Hora actual en Chile:', formatChileTime(new Date()))
 
     const { data, error } = await supabase
       .from('prospectos')
@@ -187,69 +202,79 @@ export async function guardarProspecto(datos: any): Promise<{
       } else {
         console.log('💬 Conversación creada automáticamente:', convData.id)
         
-        // 🆕 CREAR MENSAJES AUTOMÁTICOS DE LA CONVERSACIÓN
-        try {
-          const mensajes = [
-            {
-              conversacion_id: convData.id,
-              content: 'Hola, soy el asistente virtual de UNIACC. ¿En qué puedo ayudarte?',
-              type: 'bot' as const,
-              message_type: 'text',
-              sender_name: 'UNIACC Bot'
-            },
-            {
-              conversacion_id: convData.id,
-              content: 'Me interesa conocer las carreras disponibles',
-              type: 'user' as const,
-              message_type: 'text'
-            },
-            {
-              conversacion_id: convData.id,
-              content: 'Perfecto, te ayudo a conocer las carreras de UNIACC. ¿Podrías proporcionarme tu nombre completo?',
-              type: 'bot' as const,
-              message_type: 'text',
-              sender_name: 'UNIACC Bot'
-            },
-            {
-              conversacion_id: convData.id,
-              content: datos.nombre || 'Sin nombre',
-              type: 'user' as const,
-              message_type: 'text'
-            },
-            {
-              conversacion_id: convData.id,
-              content: `Excelente ${datos.nombre || 'prospecto'}. Ahora necesito tu email para enviarte información detallada.`,
-              type: 'bot' as const,
-              message_type: 'text',
-              sender_name: 'UNIACC Bot'
-            },
-            {
-              conversacion_id: convData.id,
-              content: datos.email || 'sin-email@example.com',
-              type: 'user' as const,
-              message_type: 'text'
-            },
-            {
-              conversacion_id: convData.id,
-              content: `¡Perfecto! ¿En qué carrera estás más interesado/a?`,
-              type: 'bot' as const,
-              message_type: 'text',
-              sender_name: 'UNIACC Bot'
-            },
-            {
-              conversacion_id: convData.id,
-              content: datos.carrera_interes || 'Carrera no especificada',
-              type: 'user' as const,
-              message_type: 'text'
-            },
-            {
-              conversacion_id: convData.id,
-              content: `¡Excelente elección! ${datos.nombre || 'Prospecto'} ha sido registrado exitosamente. Un asesor se pondrá en contacto contigo pronto.`,
-              type: 'bot' as const,
-              message_type: 'text',
-              sender_name: 'UNIACC Bot'
-            }
-          ]
+                 // 🆕 CREAR MENSAJES AUTOMÁTICOS DE LA CONVERSACIÓN
+         try {
+           const ahora = new Date()
+           const mensajes = [
+             {
+               conversacion_id: convData.id,
+               content: 'Hola, soy el asistente virtual de UNIACC. ¿En qué puedo ayudarte?',
+               type: 'bot' as const,
+               message_type: 'text',
+               sender_name: 'UNIACC Bot',
+               created_at: toZonedTime(new Date(ahora.getTime() - 3600000), 'America/Santiago').toISOString() // 1 hora atrás
+             },
+             {
+               conversacion_id: convData.id,
+               content: 'Me interesa conocer las carreras disponibles',
+               type: 'user' as const,
+               message_type: 'text',
+               created_at: toZonedTime(new Date(ahora.getTime() - 3300000), 'America/Santiago').toISOString() // 55 minutos atrás
+             },
+             {
+               conversacion_id: convData.id,
+               content: 'Perfecto, te ayudo a conocer las carreras de UNIACC. ¿Podrías proporcionarme tu nombre completo?',
+               type: 'bot' as const,
+               message_type: 'text',
+               sender_name: 'UNIACC Bot',
+               created_at: toZonedTime(new Date(ahora.getTime() - 3000000), 'America/Santiago').toISOString() // 50 minutos atrás
+             },
+             {
+               conversacion_id: convData.id,
+               content: datos.nombre || 'Sin nombre',
+               type: 'user' as const,
+               message_type: 'text',
+               created_at: toZonedTime(new Date(ahora.getTime() - 2700000), 'America/Santiago').toISOString() // 45 minutos atrás
+             },
+             {
+               conversacion_id: convData.id,
+               content: `Excelente ${datos.nombre || 'prospecto'}. Ahora necesito tu email para enviarte información detallada.`,
+               type: 'bot' as const,
+               message_type: 'text',
+               sender_name: 'UNIACC Bot',
+               created_at: toZonedTime(new Date(ahora.getTime() - 2400000), 'America/Santiago').toISOString() // 40 minutos atrás
+             },
+             {
+               conversacion_id: convData.id,
+               content: datos.email || 'sin-email@example.com',
+               type: 'user' as const,
+               message_type: 'text',
+               created_at: toZonedTime(new Date(ahora.getTime() - 2100000), 'America/Santiago').toISOString() // 35 minutos atrás
+             },
+             {
+               conversacion_id: convData.id,
+               content: `¡Perfecto! ¿En qué carrera estás más interesado/a?`,
+               type: 'bot' as const,
+               message_type: 'text',
+               sender_name: 'UNIACC Bot',
+               created_at: toZonedTime(new Date(ahora.getTime() - 1800000), 'America/Santiago').toISOString() // 30 minutos atrás
+             },
+             {
+               conversacion_id: convData.id,
+               content: datos.carrera_interes || 'Carrera no especificada',
+               type: 'user' as const,
+               message_type: 'text',
+               created_at: toZonedTime(new Date(ahora.getTime() - 1500000), 'America/Santiago').toISOString() // 25 minutos atrás
+             },
+             {
+               conversacion_id: convData.id,
+               content: `¡Excelente elección! ${datos.nombre || 'Prospecto'} ha sido registrado exitosamente. Un asesor se pondrá en contacto contigo pronto.`,
+               type: 'bot' as const,
+               message_type: 'text',
+               sender_name: 'UNIACC Bot',
+               created_at: toZonedTime(new Date(ahora.getTime() - 1200000), 'America/Santiago').toISOString() // 20 minutos atrás
+             }
+           ]
 
           for (const mensaje of mensajes) {
             const { error: msgError } = await supabase
@@ -261,7 +286,12 @@ export async function guardarProspecto(datos: any): Promise<{
             }
           }
 
-          console.log('💬 Mensajes de conversación creados automáticamente')
+                     console.log('💬 Mensajes de conversación creados automáticamente')
+           console.log('🕐 Horas de los mensajes:')
+           mensajes.forEach((msg, index) => {
+             const hora = formatChileTime(msg.created_at)
+             console.log(`  ${index + 1}. ${msg.type === 'bot' ? 'Bot' : 'User'}: ${hora}`)
+           })
           
           // Actualizar el contador de mensajes en la conversación
           await supabase
@@ -337,10 +367,10 @@ export async function guardarMensaje(datos: {
       message_type: (datos.message_type as any) || 'text',
       sender_id: datos.sender_id || undefined,
       sender_name: datos.type === 'bot' ? 'UNIACC Bot' : undefined,
-      metadata: {
-        timestamp: new Date().toISOString(),
-        bot_version: '1.0.0'
-      }
+             metadata: {
+         timestamp: getChileTime(), // 🕐 Usar hora de Chile
+         bot_version: '1.0.0'
+       }
     }
 
     const { data, error } = await supabase
@@ -363,7 +393,7 @@ export async function guardarMensaje(datos: {
         .from('conversaciones')
         .update({ 
           message_count: (conversacion.message_count || 0) + 1,
-          last_message_at: new Date().toISOString()
+          last_message_at: getChileTime() // 🕐 Usar hora de Chile
         })
         .eq('id', datos.conversacion_id)
     }

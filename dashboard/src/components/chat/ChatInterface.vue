@@ -162,11 +162,11 @@
           <!-- Acciones del header -->
           <div class="flex items-center space-x-2">
             <!-- Asignar ejecutivo -->
-            <select
-              v-if="!chat.conversacionActiva.value.assigned_to"
-              @change="asignarEjecutivo($event.target.value)"
-              class="text-sm border border-gray-300 rounded px-2 py-1"
-            >
+                         <select
+               v-if="!chat.conversacionActiva.value.assigned_to"
+               @change="(event) => asignarEjecutivo((event.target as HTMLSelectElement).value)"
+               class="text-sm border border-gray-300 rounded px-2 py-1"
+             >
               <option value="">Asignar a...</option>
               <option
                 v-for="ejecutivo in ejecutivos.ejecutivosDisponibles.value"
@@ -211,15 +211,15 @@
             <div class="bg-blue-500 text-white rounded-lg px-4 py-2">
               <p class="text-sm">{{ mensaje.content }}</p>
             </div>
-            <div class="flex items-center justify-end mt-1 space-x-1">
-              <span class="text-xs text-gray-500">
-                {{ formatearHora(mensaje.timestamp) }}
-              </span>
-              <component 
-                :is="getStatusIcon(mensaje.status)" 
-                class="w-3 h-3 text-gray-400"
-              />
-            </div>
+                         <div class="flex items-center justify-end mt-1 space-x-1">
+               <span class="text-xs text-gray-500">
+                 {{ formatearHora(mensaje.timestamp) }}
+               </span>
+               <component 
+                 :is="getStatusIcon(mensaje.status)" 
+                 class="w-3 h-3 text-gray-400"
+               />
+             </div>
           </div>
 
           <!-- Mensaje del bot o ejecutivo -->
@@ -250,22 +250,22 @@
                 >
                   <p class="text-sm">{{ mensaje.content }}</p>
                 </div>
-                <div class="flex items-center mt-1 space-x-1">
-                  <span class="text-xs text-gray-500">
-                    {{ mensaje.sender_name || (mensaje.type === 'bot' ? 'ChatBot' : 'Ejecutivo') }}
-                  </span>
-                  <span class="text-xs text-gray-400">•</span>
-                  <span class="text-xs text-gray-500">
-                    {{ formatearHora(mensaje.timestamp) }}
-                  </span>
-                  <span 
-                    v-if="mensaje.is_automated"
-                    class="text-xs text-blue-500"
-                    title="Mensaje automático"
-                  >
-                    🤖
-                  </span>
-                </div>
+                                 <div class="flex items-center mt-1 space-x-1">
+                   <span class="text-xs text-gray-500">
+                     {{ mensaje.sender_name || (mensaje.type === 'bot' ? 'ChatBot' : 'Ejecutivo') }}
+                   </span>
+                   <span class="text-xs text-gray-400">•</span>
+                   <span class="text-xs text-gray-500">
+                     {{ formatearHora(mensaje.timestamp) }}
+                   </span>
+                   <span 
+                     v-if="mensaje.is_automated"
+                     class="text-xs text-blue-500"
+                     title="Mensaje automático"
+                   >
+                     🤖
+                   </span>
+                 </div>
               </div>
             </div>
           </div>
@@ -428,15 +428,18 @@ const asignarEjecutivo = async (ejecutivoId: string) => {
 const cerrarConversacion = async () => {
   if (!chat.conversacionActiva.value) return
 
-  // TODO: Implementar cerrarConversacion en useChat
-  console.log('🔄 Función cerrarConversacion no implementada aún')
+  const confirmar = confirm('¿Estás seguro de que quieres cerrar esta conversación?')
+  if (!confirmar) return
+
+  await chat.cerrarConversacion(chat.conversacionActiva.value.id)
+  console.log('✅ Conversación cerrada exitosamente')
 }
 
 const manejarEscritura = () => {
   if (!chat.conversacionActiva.value) return
   
-  // TODO: Implementar iniciarEscritura en useChat
-  console.log('🔄 Función iniciarEscritura no implementada aún')
+  // Indicar que el ejecutivo está escribiendo
+  chat.iniciarEscritura(chat.conversacionActiva.value.id, 'ejecutivo_current')
 }
 
 const scrollToBottom = async () => {
@@ -469,19 +472,19 @@ const getEstadoColor = (conversacion: ChatSession): string => {
 }
 
 const getEstadoTexto = (conversacion: ChatSession): string => {
-  const estados = {
+  const estados: Record<string, string> = {
     active: 'Activa',
     pending: 'Pendiente',
-    closed: 'Cerrada'
+    closed: 'Cerrada',
+    ended: 'Finalizada',
+    transferred: 'Transferida'
   }
   return estados[conversacion.status] || 'Desconocido'
 }
 
 const formatearHora = (timestamp: string): string => {
-  return new Date(timestamp).toLocaleTimeString('es-ES', {
-    hour: '2-digit',
-    minute: '2-digit'
-  })
+  // 🕐 Usar la función del composable que maneja timezone de Chile
+  return chat.formatearHoraMensaje(timestamp)
 }
 
 const getStatusIcon = (status: ChatMessage['status']) => {

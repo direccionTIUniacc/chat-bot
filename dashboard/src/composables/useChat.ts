@@ -84,9 +84,23 @@ export function useChat() {
       const result = await response.json()
 
       if (result.success && result.data) {
-        mensajes.value[sessionId] = result.data
-        console.log(`✅ Mensajes cargados para conversación ${sessionId}:`, result.data.length)
-        return handleSupabaseSuccess(result.data)
+        // 🕐 Mapear mensajes del chatbot al formato del dashboard
+        const mensajesMapeados: ChatMessage[] = result.data.map((msg: any) => ({
+          id: msg.id,
+          session_id: sessionId,
+          type: msg.type === 'bot' ? 'bot' : msg.type === 'user' ? 'user' : 'ejecutivo',
+          content: msg.content,
+          timestamp: msg.created_at || msg.timestamp, // 🕐 Usar created_at del chatbot
+          message_type: msg.message_type || 'text',
+          sender_name: msg.sender_name,
+          status: 'delivered',
+          is_automated: msg.type === 'bot',
+          metadata: msg.metadata || {}
+        }))
+        
+        mensajes.value[sessionId] = mensajesMapeados
+        console.log(`✅ Mensajes mapeados para conversación ${sessionId}:`, mensajesMapeados.length)
+        return handleSupabaseSuccess(mensajesMapeados)
       } else {
         console.error('❌ Error cargando mensajes:', result.error)
         mensajes.value[sessionId] = []
@@ -173,6 +187,7 @@ export function useChat() {
     return ejecutivo?.nombre || 'Sin asignar'
   }
 
+  // 🕐 Formatear tiempo en zona horaria de Chile
   const formatearTiempo = (timestamp: string): string => {
     try {
       const fecha = new Date(timestamp)
@@ -189,6 +204,21 @@ export function useChat() {
       return fecha.toLocaleDateString()
     } catch {
       return 'Fecha inválida'
+    }
+  }
+
+  // 🕐 Formatear hora específica para mensajes (timezone Chile)
+  const formatearHoraMensaje = (timestamp: string): string => {
+    try {
+      const fecha = new Date(timestamp)
+      // Formatear en hora local (el timestamp ya viene en timezone de Chile)
+      return fecha.toLocaleTimeString('es-ES', {
+        hour: '2-digit',
+        minute: '2-digit',
+        timeZone: 'America/Santiago'
+      })
+    } catch {
+      return 'Hora inválida'
     }
   }
 
@@ -221,6 +251,7 @@ export function useChat() {
     getContactName,
     getEjecutivoNombre,
     formatearTiempo,
+    formatearHoraMensaje, // 🕐 Nueva función para formatear horas
 
     // Para testing
     setConversacionActiva: (conversacion: ChatSession | null) => {
@@ -232,6 +263,53 @@ export function useChat() {
       conversacionActiva.value = conversacion
       // Cargar mensajes de la conversación seleccionada
       obtenerMensajes(conversacion.id)
+    },
+
+    // 🆕 CERRAR CONVERSACIÓN
+    cerrarConversacion: async (sessionId: string): Promise<ApiResponse<boolean>> => {
+      try {
+        loading.value = true
+        error.value = null
+
+        // Actualizar estado local
+        const conversacion = conversaciones.value.find(c => c.id === sessionId)
+        if (conversacion) {
+          conversacion.status = 'closed'
+        }
+
+        // Limpiar conversación activa si es la misma
+        if (conversacionActiva.value?.id === sessionId) {
+          conversacionActiva.value = null
+        }
+
+        // TODO: En el futuro, sincronizar con Supabase
+        console.log('✅ Conversación cerrada:', sessionId)
+        return handleSupabaseSuccess(true)
+      } catch (err) {
+        error.value = 'Error cerrando conversación'
+        return handleSupabaseError(err)
+      } finally {
+        loading.value = false
+      }
+    },
+
+    // 🆕 INICIAR INDICADOR DE ESCRITURA
+    iniciarEscritura: (sessionId: string, userId: string): void => {
+      if (!usuariosEscribiendo.value[sessionId]) {
+        usuariosEscribiendo.value[sessionId] = []
+      }
+      
+      // Agregar usuario a la lista de escribiendo
+      if (!usuariosEscribiendo.value[sessionId].includes(userId)) {
+        usuariosEscribiendo.value[sessionId].push(userId)
+      }
+
+      // Remover después de 3 segundos
+      setTimeout(() => {
+        if (usuariosEscribiendo.value[sessionId]) {
+          usuariosEscribiendo.value[sessionId] = usuariosEscribiendo.value[sessionId].filter(id => id !== userId)
+        }
+      }, 3000)
     }
   }
 }

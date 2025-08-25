@@ -1,0 +1,33 @@
+{
+  "name": "uniacc-chatbot-monorepo",
+  "version": "1.0.0",
+  "description": "Sistema completo de chatbot conversacional para UNIACC",
+  "private": true,
+  "workspaces": [
+    "chatbot",
+    "dashboard"
+  ],
+  "scripts": {
+    "dev": "concurrently \"npm run dev:chatbot\" \"npm run dev:dashboard\"",
+    "dev:chatbot": "cd chatbot && npm run dev",
+    "dev:dashboard": "cd dashboard && npm run dev",
+    "build": "npm run build:chatbot && npm run build:dashboard",
+    "build:chatbot": "cd chatbot && npm run build",
+    "build:dashboard": "cd dashboard && npm run build",
+    "install:all": "npm install && cd chatbot && npm install && cd ../dashboard && npm install"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  },
+  "keywords": [
+    "chatbot",
+    "whatsapp",
+    "uniacc",
+    "vue",
+    "nodejs",
+    "typescript",
+    "monorepo"
+  ],
+  "author": "Juan Silva",
+  "license": "MIT"
+}

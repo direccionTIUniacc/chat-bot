@@ -412,20 +412,36 @@ Un asesor especializado te contactará para:
 
     console.log('📊 Nuevo prospecto capturado:', datos)
 
-    // ✅ Prospecto procesado - guardado en memoria para el MVP
-    console.log(`✅ Prospecto completado para: ${datos.nombre || 'Sin nombre'}`)
-    
-    // Notificar al bot principal que hay un nuevo prospecto
+    // ✅ Guardar en Supabase primero, fallback a memoria
     try {
-      // Llamar función global para agregar prospecto
+      const { guardarProspecto } = await import('../utils/supabase-client')
+      
+      const resultado = await guardarProspecto({
+        ...datos,
+        whatsapp: userId
+      })
+
+      if (resultado.success) {
+        console.log('🎯 Prospecto guardado en Supabase:', resultado.data?.id)
+      } else {
+        console.warn('⚠️ Error Supabase, usando fallback:', resultado.error)
+        // Fallback a memoria local
+        if (typeof (global as any).agregarProspecto === 'function') {
+          (global as any).agregarProspecto({
+            ...datos,
+            whatsapp: userId
+          })
+        }
+      }
+    } catch (error: any) {
+      console.error('💥 Error crítico con Supabase:', error.message)
+      // Fallback a memoria local
       if (typeof (global as any).agregarProspecto === 'function') {
         (global as any).agregarProspecto({
           ...datos,
           whatsapp: userId
         })
       }
-    } catch (error) {
-      console.log('ℹ️ Prospecto capturado, pendiente de sincronización')
     }
 
     this.resetUsuario(userId)

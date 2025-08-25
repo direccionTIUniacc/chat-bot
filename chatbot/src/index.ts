@@ -468,13 +468,33 @@ app.get('/', (req: Request, res: Response) => {
 })
 
 // **ENDPOINT: Health check**
-app.get('/health', (req: Request, res: Response) => {
-  res.status(200).json({
+app.get('/health', async (req: Request, res: Response) => {
+  const health = {
     status: 'healthy',
     timestamp: new Date().toISOString(),
     version: '1.0.0',
-    service: 'UNIACC WhatsApp Bot'
-  })
+    service: 'UNIACC WhatsApp Bot',
+    database: 'unknown',
+    supabase_config: {
+      url_configured: !!process.env.SUPABASE_URL,
+      key_configured: !!(process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_SERVICE_KEY)
+    }
+  }
+
+  // Test conexión Supabase
+  try {
+    const { testConexion } = await import('./utils/supabase-client')
+    const resultado = await testConexion()
+    health.database = resultado.success ? 'connected' : 'error'
+    if (!resultado.success) {
+      (health as any).database_error = resultado.message
+    }
+  } catch (error: any) {
+    health.database = 'unavailable'
+    ;(health as any).database_error = error.message
+  }
+
+  res.status(200).json(health)
 })
 
 // **ENDPOINT: Estadísticas del bot**
@@ -695,12 +715,38 @@ app.use((error: any, req: Request, res: Response, next: NextFunction) => {
   })
 })
 
-// Endpoints para el dashboard
+// Endpoints para el dashboard (con Supabase + fallback)
 app.get('/api/prospectos', async (req: Request, res: Response) => {
   try {
+    // Intentar obtener de Supabase primero
+    try {
+      const { supabase } = await import('./utils/supabase-client')
+      
+      const { data: supabaseData, error } = await supabase
+        .from('prospectos')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(100)
+
+      if (!error && supabaseData) {
+        console.log(`📊 Obtenidos ${supabaseData.length} prospectos de Supabase`)
+        return res.json({ 
+          success: true, 
+          data: supabaseData,
+          source: 'supabase'
+        })
+      } else {
+        console.warn('⚠️ Error Supabase:', error?.message)
+      }
+    } catch (supabaseError) {
+      console.warn('⚠️ Supabase no disponible, usando memoria local')
+    }
+
+    // Fallback a memoria local
     res.json({ 
       success: true, 
-      data: [...prospectos].reverse() // Más recientes primero
+      data: [...prospectos].reverse(),
+      source: 'memory'
     })
   } catch (error) {
     console.error('Error obteniendo prospectos:', error)
@@ -713,9 +759,31 @@ app.get('/api/prospectos', async (req: Request, res: Response) => {
 
 app.get('/api/stats', async (req: Request, res: Response) => {
   try {
+    // Intentar obtener stats de Supabase
+    try {
+      const { obtenerEstadisticas } = await import('./utils/supabase-client')
+      
+      const resultado = await obtenerEstadisticas()
+      
+      if (resultado.success) {
+        console.log('📊 Stats obtenidas de Supabase')
+        return res.json({
+          success: true,
+          data: resultado.data,
+          source: 'supabase'
+        })
+      } else {
+        console.warn('⚠️ Error stats Supabase:', resultado.error)
+      }
+    } catch (supabaseError) {
+      console.warn('⚠️ Supabase stats no disponible, usando memoria local')
+    }
+
+    // Fallback a stats en memoria
     res.json({
       success: true,
-      data: stats
+      data: stats,
+      source: 'memory'
     })
   } catch (error) {
     res.status(500).json({ success: false, error: 'Error interno' })

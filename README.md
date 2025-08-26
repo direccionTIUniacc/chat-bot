@@ -1,20 +1,28 @@
-# 🎓 UNIACC ChatBot - Sistema Completo
+# 🎓 UNIACC ChatBot - Sistema Completo de Captación de Prospectos
 
 ## 📋 Descripción
 
-Sistema completo de chatbot conversacional para UNIACC que incluye:
-- **Chatbot WhatsApp** (Node.js/Express) 
-- **Dashboard de Gestión** (Vue 3 + TypeScript)
+Sistema completo de chatbot conversacional para UNIACC con arquitectura de microservicios:
+- **🤖 Chatbot Backend** (Node.js/TypeScript) - Puerto 3001
+- **📊 Dashboard Frontend** (Vue 3 + TypeScript) - Puerto 3000  
+- **🔌 Dashboard API Server** (Node.js/Express) - Puerto 3002
+- **🗄️ Base de Datos** (Supabase PostgreSQL)
 
-## 🏗️ Arquitectura del Monorepo
+## 🏗️ Arquitectura de Microservicios
 
 ```
 chatboot-uniacc/
-├── chatbot/          # Bot de WhatsApp (Node.js/Express)
-├── dashboard/        # Dashboard de gestión (Vue 3)
-├── docs/            # Documentación
-├── package.json     # Scripts del monorepo
-└── README.md        # Este archivo
+├── 📁 chatbot/           # Backend del ChatBot (Puerto 3001)
+│   ├── src/actions/      # Lógica conversacional y integraciones
+│   ├── src/data/         # Datos de UNIACC (facultades, carreras)
+│   ├── src/utils/        # Utilidades y clientes
+│   └── .env             # Variables de entorno
+├── 📁 dashboard/         # Dashboard Frontend y API
+│   ├── src/             # Frontend Vue.js (Puerto 3000)
+│   ├── server.js        # API Server (Puerto 3002)
+│   └── .env             # Variables de entorno
+├── 📄 arquitectura.md   # Documentación técnica completa
+└── 📄 README.md         # Este archivo
 ```
 
 ## 🚀 Instalación y Configuración
@@ -27,116 +35,172 @@ chatboot-uniacc/
 ```bash
 # Clonar repositorio
 git clone https://github.com/direccionTIUniacc/chat-bot.git
-cd chat-bot
+cd chatboot-uniacc
 
-# Instalar dependencias de todos los proyectos
+# Instalar dependencias del chatbot
+cd chatbot
 npm install
 
-# Configurar variables de entorno
-cp chatbot/.env.example chatbot/.env
-cp dashboard/.env.example dashboard/.env
+# Instalar dependencias del dashboard
+cd ../dashboard
+npm install
 ```
 
-## 🛠️ Comandos Disponibles
+### Configuración de Supabase
+1. Crear proyecto en [Supabase](https://supabase.com/)
+2. Ejecutar el esquema de BD desde `arquitectura.md`
+3. Configurar variables de entorno con las credenciales
 
-### Desarrollo
+## 🛠️ Comandos de Desarrollo
+
+### Levantar todos los servicios
 ```bash
-# Levantar ambos proyectos simultáneamente
+# Terminal 1: ChatBot Backend (Puerto 3001)
+cd chatbot
 npm run dev
 
-# Levantar solo el chatbot
-npm run dev:chatbot
+# Terminal 2: Dashboard API Server (Puerto 3002)
+cd dashboard
+npm run dev:server
 
-# Levantar solo el dashboard
-npm run dev:dashboard
+# Terminal 3: Dashboard Frontend (Puerto 3000)
+cd dashboard
+npm run dev
 ```
 
-### Producción
-```bash
-# Build de ambos proyectos
-npm run build
+### URLs de desarrollo
+- 🤖 **Chatbot:** http://localhost:3001
+- 📊 **Dashboard:** http://localhost:3000  
+- 🔌 **API Server:** http://localhost:3002
+- 💬 **Chat Demo:** http://localhost:3001/chat
 
-# Build solo chatbot
-npm run build:chatbot
+## 🎯 Funcionalidades Implementadas (MVP)
 
-# Build solo dashboard
-npm run build:dashboard
-```
+### 🤖 Chatbot Backend (Puerto 3001)
+- ✅ **Flujos conversacionales completos:**
+  - Captura inicial de datos del prospecto
+  - Exploración de carreras por facultad
+  - Información de proceso de admisión 2025
+  - Costos, becas y beneficios
+  - Modalidades de estudio (presencial, online, híbrida)
+  - Conexión con asesor humano
+- ✅ **Gestión de estado por usuario**
+- ✅ **Integración con Supabase**
+- ✅ **Validación de datos (email, teléfono)**
+- ✅ **Interfaz web de testing**
+- ✅ **Webhooks para WhatsApp Business API**
 
-## 🎯 Funcionalidades
+### 📊 Dashboard Frontend (Puerto 3000)
+- ✅ **Gestión de prospectos en tiempo real**
+- ✅ **Lista de conversaciones activas**
+- ✅ **Interfaz de chat para ejecutivos**
+- ✅ **Métricas y estadísticas**
+- ✅ **Responsive design**
+- ✅ **TypeScript con tipado fuerte**
 
-### 🤖 Chatbot (`/chatbot`)
-- ✅ Conversaciones inteligentes en WhatsApp
-- ✅ Captura de leads universitarios
-- ✅ API REST para integración
-- ✅ Interfaz web de demostración
-- ✅ Sistema de rate limiting
-- ✅ Almacenamiento en memoria (MVP)
+### 🔌 Dashboard API Server (Puerto 3002)
+- ✅ **API REST completa**
+- ✅ **Integración directa con Supabase**
+- ✅ **Función RPC para upsert de prospectos**
+- ✅ **Gestión de conversaciones y mensajes**
+- ✅ **CORS configurado**
+- ✅ **Validación de datos**
 
-### 📊 Dashboard (`/dashboard`)
-- ✅ Gestión de prospectos
-- ✅ Métricas y analytics
-- ✅ Conversaciones en tiempo real
-- ✅ Automatizaciones
-- ✅ Gestión de ejecutivos
+### 🗄️ Base de Datos (Supabase)
+- ✅ **Tabla de prospectos con campos completos**
+- ✅ **Tabla de conversaciones**
+- ✅ **Tabla de mensajes**
+- ✅ **Función RPC para evitar duplicados**
+- ✅ **Timestamps automáticos**
 
-## 🔗 Endpoints Principales
+## 🔗 Endpoints API
 
-### Chatbot (Puerto 3001)
-- `GET /` - Interfaz de demostración
-- `POST /webhook` - Webhook de WhatsApp
-- `GET /api/prospectos` - Lista de prospectos
-- `GET /api/stats` - Estadísticas
+### Chatbot Backend (Puerto 3001)
+- `GET /` - Página principal
+- `GET /chat` - **Interfaz de testing del chat**
+- `POST /webhook` - Webhook WhatsApp Business
+- `POST /test-chat` - **Endpoint para probar conversaciones**
 - `GET /health` - Health check
+- `GET /stats` - Estadísticas del bot
 
-### Dashboard (Puerto 3000)
-- `/` - Dashboard principal
-- `/prospectos` - Gestión de prospectos
-- `/conversaciones` - Chat en tiempo real
-- `/automatizaciones` - Configuración de bots
+### Dashboard API Server (Puerto 3002)
+- `POST /api/prospectos` - **Crear/actualizar prospecto**
+- `GET /api/prospectos` - Listar prospectos
+- `POST /api/interacciones` - **Registrar interacciones del bot**
+- `GET /api/conversaciones` - **Listar conversaciones**
+- `GET /api/conversaciones/:id/mensajes` - **Mensajes de conversación**
+- `GET /api/stats` - **Estadísticas generales**
+- `GET /health` - Health check
 
 ## 📈 Estado del Proyecto
 
-### ✅ Completado
-- [x] Chatbot funcional con flujos conversacionales
-- [x] Dashboard con gestión de prospectos
-- [x] Integración entre ambos sistemas
-- [x] Estructura de monorepo
-- [x] Sistema de captura de leads
-- [x] Interfaz web de demostración
+### ✅ MVP Completado (Agosto 2025)
+- [x] **Chatbot completo** con todos los flujos conversacionales
+- [x] **Dashboard funcional** con gestión de prospectos y conversaciones  
+- [x] **Integración Supabase** con persistencia de datos
+- [x] **API REST completa** para comunicación entre servicios
+- [x] **Sistema de captura** de prospectos con validaciones
+- [x] **Interfaz web de testing** completamente funcional
+- [x] **Documentación técnica** completa (arquitectura.md)
+- [x] **Gestión de estado** avanzada por usuario
+- [x] **Función RPC personalizada** para evitar duplicados
+- [x] **Variables de entorno** configuradas para todos los servicios
 
-### 🔄 En desarrollo
-- [ ] Integración con WhatsApp Business API
-- [ ] Deploy en producción
-- [ ] Tests automatizados
-- [ ] Documentación técnica completa
+### 🔄 Próximas Fases
+- [ ] **Integración real** con WhatsApp Business API
+- [ ] **Notificaciones en tiempo real** (WebSockets)
+- [ ] **Deploy en producción** (AWS/GCP)
+- [ ] **Tests automatizados** (Jest/Cypress)
+- [ ] **Métricas avanzadas** y analytics
+- [ ] **Sistema de roles** y permisos
+- [ ] **CRM integrado** para seguimiento de leads
 
-## 🚦 Comenzar Desarrollo
+## 🚦 Guía de Inicio Rápido
 
-1. **Clonar y configurar:**
-   ```bash
-   git clone https://github.com/direccionTIUniacc/chat-bot.git
-   cd chat-bot
-   npm install
-   ```
+### 1. **Configurar el proyecto:**
+```bash
+# Clonar repositorio
+git clone https://github.com/direccionTIUniacc/chat-bot.git
+cd chatboot-uniacc
 
-2. **Configurar variables de entorno:**
-   ```bash
-   # Chatbot
-   cp chatbot/.env.example chatbot/.env
-   
-   # Dashboard
-   cp dashboard/.env.example dashboard/.env
-   ```
+# Instalar dependencias
+cd chatbot && npm install
+cd ../dashboard && npm install
+```
 
-3. **Levantar en modo desarrollo:**
-   ```bash
-   npm run dev
-   ```
+### 2. **Configurar Supabase:**
+- Crear proyecto en [Supabase](https://supabase.com/)
+- Ejecutar el esquema SQL desde `arquitectura.md`
+- Copiar credenciales a archivos `.env`
 
-4. **Acceder a las aplicaciones:**
-   - 🤖 Chatbot: http://localhost:3001
-   - 📊 Dashboard: http://localhost:3000
+### 3. **Variables de entorno requeridas:**
+```bash
+# chatbot/.env
+SUPABASE_URL=tu_url_supabase
+SUPABASE_ANON_KEY=tu_anon_key
+VUE_WEBHOOK_URL=http://localhost:3002/api/prospectos
+
+# dashboard/.env (para API Server)
+VITE_SUPABASE_URL=tu_url_supabase
+VITE_SUPABASE_ANON_KEY=tu_anon_key
+```
+
+### 4. **Levantar servicios (3 terminales):**
+```bash
+# Terminal 1: ChatBot Backend
+cd chatbot && npm run dev
+
+# Terminal 2: Dashboard API Server  
+cd dashboard && npm run dev:server
+
+# Terminal 3: Dashboard Frontend
+cd dashboard && npm run dev
+```
+
+### 5. **Probar el sistema:**
+- 💬 **Chat de prueba:** http://localhost:3001/chat
+- 📊 **Dashboard:** http://localhost:3000
+- 🔌 **API Health:** http://localhost:3002/health
 
 ## 🤝 Contribución
 
@@ -146,57 +210,109 @@ npm run build:dashboard
 4. Push al branch (`git push origin feature/nueva-funcionalidad`)
 5. Crear Pull Request
 
-## 📱 Demo del Chatbot
+## 💬 Flujos del Chatbot Implementados
 
-El chatbot incluye flujos conversacionales para:
-
-- 🎓 **Información de carreras** por facultad
-- 📝 **Captura de datos** de prospectos
-- 🤝 **Solicitud de asesoría** personalizada
-- 📊 **Integración automática** con dashboard
-
-### Ejemplo de conversación:
+### 🎯 **Menú Principal (5 Opciones)**
 ```
-Usuario: hola
-Bot: 🎓 ¡Hola! Soy el asistente virtual de UNIACC...
-
-Usuario: 1
-Bot: 🎨 FACULTADES Y CARRERAS UNIACC...
-
-Usuario: asesor
-Bot: 📝 Para brindarte la mejor atención, ¿cuál es tu nombre completo?
+1️⃣ Conocer nuestras carreras
+2️⃣ Proceso de admisión 2025  
+3️⃣ Costos y becas
+4️⃣ Modalidades de estudio
+5️⃣ Hablar con un asesor
 ```
 
-## 🏗️ Tecnologías Utilizadas
+### 📋 **Proceso de Captura de Prospectos**
+```
+1. Saludo inicial → Solicita nombre
+2. Solicita email (con validación)
+3. Solicita edad y región
+4. Solicita teléfono
+5. Guarda en Supabase → Menú principal
+```
 
-### Backend (Chatbot)
-- **Node.js** + **Express.js**
-- **TypeScript**
-- **dotenv** para variables de entorno
-- **cors** y **helmet** para seguridad
+### 🎓 **Exploración de Carreras por Facultad**
+- **A) Artes:** Teatro, Danza, Música, Artes Visuales
+- **B) Comunicaciones:** Audiovisual, Periodismo, Publicidad
+- **C) Arquitectura y Diseño:** Arquitectura, Diseño de Interiores
+- **D) Ciencias Jurídicas:** Derecho, Psicología
+- **E) Negocios y Tecnología:** Ing. Comercial, Contador Auditor
 
-### Frontend (Dashboard)
+### 💰 **Información Completa de UNIACC**
+- **Costos y becas** actualizados 2025
+- **Modalidades:** Presencial, Semipresencial, Online
+- **Proceso de admisión** independiente del DEMRE
+- **Fechas importantes** de matrícula e inicio
+
+## 🛠️ Stack Tecnológico
+
+### **Backend**
+- **Node.js 18+** + **Express.js**
+- **TypeScript** con tipado fuerte
+- **Supabase** PostgreSQL + RPC functions
+- **dotenv** para configuración
+- **CORS** y validación de datos
+
+### **Frontend**
 - **Vue 3** + **Composition API**
-- **TypeScript**
-- **Tailwind CSS**
-- **Vite** como build tool
+- **TypeScript** + **Vite**
+- **Tailwind CSS** responsive
+- **Componentes reutilizables**
 
-### DevOps
-- **npm workspaces** para monorepo
-- **concurrently** para desarrollo
-- **Git** para versionado
+### **Base de Datos**
+- **Supabase PostgreSQL**
+- **Tablas:** prospectos, conversaciones, mensajes
+- **RPC:** upsert_prospecto_por_whatsapp
+- **Real-time** subscriptions ready
 
-## 📝 Licencia
+### **Arquitectura**
+- **Microservicios** independientes
+- **API REST** para comunicación
+- **Estado distribuido** por servicio
 
-Este proyecto está bajo la Licencia MIT.
+## 📚 Documentación Completa
 
-## 🎓 UNIACC
+- 📄 **[arquitectura.md](./arquitectura.md)** - Documentación técnica detallada
+- 🔗 **[Supabase Schema](./arquitectura.md#base-de-datos-supabase)** - Esquema de base de datos
+- 🛠️ **[Variables de Entorno](./arquitectura.md#variables-de-entorno)** - Configuración completa
+- 📊 **[Flujo de Datos](./arquitectura.md#flujo-de-datos)** - Diagramas de arquitectura
 
-**Universidad de Artes, Ciencias y Comunicación**
-- 🌐 Sitio web: https://www.uniacc.cl
-- 📧 Email: admision@uniacc.cl
-- 📞 Teléfono: +56 2 2640 6000
+## 🚀 Deploy y Producción
+
+### **Preparación para producción:**
+```bash
+# Build del chatbot
+cd chatbot
+npm run build
+
+# Build del dashboard  
+cd dashboard
+npm run build
+```
+
+### **Variables de producción requeridas:**
+- `WHATSAPP_ACCESS_TOKEN` - Token real de WhatsApp Business API
+- `SUPABASE_URL` y `SUPABASE_ANON_KEY` - Credenciales de producción
+- `NODE_ENV=production`
+
+## 🎓 UNIACC - Universidad de Artes, Ciencias y Comunicaciones
+
+- 🌐 **Sitio web:** https://www.uniacc.cl
+- 📧 **Admisión:** admision@uniacc.cl  
+- 📞 **Teléfono:** +56 2 2640 6000
+- 📍 **Campus:** Av. Salvador 1200, Providencia (Metro Salvador)
 
 ---
 
-**Desarrollado con ❤️ para UNIACC**
+## 📊 Métricas del MVP
+
+| Métrica | Estado |
+|---------|--------|
+| **Flujos conversacionales** | ✅ 5 flujos completos |
+| **Captura de prospectos** | ✅ 100% funcional |
+| **Integración BD** | ✅ Supabase operativa |
+| **API Endpoints** | ✅ 12 endpoints activos |
+| **Frontend responsivo** | ✅ Desktop + Mobile |
+| **Documentación** | ✅ Completa |
+
+**🎯 MVP Completado:** Agosto 2025  
+**📈 Próximo hito:** Integración WhatsApp Business API real

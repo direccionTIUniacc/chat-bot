@@ -202,10 +202,13 @@ Escribe el **número** de tu región:`
             whatsapp: userId, // El userId es el número de WhatsApp
             edad: datos.edad,
             region: datos.region,
+            carrera_interes: state.carrera_seleccionada || datos.carrera_interes || 'Sin especificar',
+            facultad_interes: state.facultad_seleccionada || 'Sin especificar',
             source: 'whatsapp_bot'
           }
 
           console.log('💾 Guardando prospecto:', prospectoData.nombre)
+          console.log('📋 Datos enviados:', JSON.stringify(prospectoData, null, 2))
           const resultado = await this.supabaseIntegration.enviarProspecto(prospectoData)
           
           if (resultado.success) {
@@ -278,11 +281,21 @@ Escribe el número de tu opción 📝`
     }
 
     if (mensaje.includes('5') || mensaje.includes('asesor') || mensaje.includes('humano')) {
-      this.setUsuarioState(userId, {
-        flujo_actual: 'captura_datos',
-        paso_actual: 'nombre'
-      })
-      return await this.iniciarCapturaDatos(userId)
+      // Verificar si ya tiene datos completos antes de pedir nuevos datos
+      const state = this.getUsuarioState(userId)
+      const datos = state.datos_prospecto
+      
+      if (datos.nombre && datos.email && datos.telefono) {
+        console.log('✅ Usuario', userId, 'ya tiene datos completos, finalizando solicitud de asesor')
+        return await this.iniciarCapturaDatos(userId)
+      } else {
+        // Solo cambiar el flujo si no tiene datos completos
+        this.setUsuarioState(userId, {
+          flujo_actual: 'captura_datos',
+          paso_actual: 'nombre'
+        })
+        return await this.iniciarCapturaDatos(userId)
+      }
     }
 
     return this.manejarNoEntendido(userId)
@@ -433,8 +446,13 @@ Escribe el número de tu opción 📝`
         }
 
       case 'carrera_interes':
+        // Buscar la facultad de la carrera ingresada
+        const facultadEncontrada = this.buscarFacultadPorCarrera(mensaje)
+        
         this.setUsuarioState(userId, {
           datos_prospecto: { ...state.datos_prospecto, carrera_interes: mensaje },
+          carrera_seleccionada: mensaje,
+          facultad_seleccionada: facultadEncontrada?.id,
           paso_actual: 'completado'
         })
         return await this.finalizarCapturaDatos(userId)
@@ -456,7 +474,9 @@ Escribe el número de tu opción 📝`
 
 💡 **¿Sabías que?** UNIACC tiene proceso independiente
 
-¿Necesitas ayuda con algún documento específico?`
+¿Necesitas ayuda con algún documento específico?
+
+${this.mostrarMenuNavegacion()}`
     }
 
     if (mensaje.includes('fecha') || mensaje.includes('plazo')) {
@@ -470,7 +490,9 @@ Escribe el número de tu opción 📝`
 • Fecha: 10 de Marzo 2025
 • Inducción: 3-7 de Marzo
 
-¿Te ayudo con el proceso de postulación?`
+¿Te ayudo con el proceso de postulación?
+
+${this.mostrarMenuNavegacion()}`
     }
 
     if (mensaje.includes('asesor') || mensaje.includes('ayuda')) {
@@ -481,7 +503,33 @@ Escribe el número de tu opción 📝`
       return await this.iniciarCapturaDatos(userId)
     }
 
-    return this.iniciarConversacion(userId)
+    // Manejar opciones del menú principal cuando está en proceso admisión
+    if (mensaje.includes('1') || mensaje.includes('carrera')) {
+      this.setUsuarioState(userId, {
+        flujo_actual: 'exploracion_carreras',
+        paso_actual: 'seleccion_facultad'
+      })
+      return RESPUESTAS.menu_facultades
+    }
+
+    if (mensaje.includes('3') || mensaje.includes('costo') || mensaje.includes('beca')) {
+      return this.mostrarCostosYBecas(userId)
+    }
+
+    if (mensaje.includes('4') || mensaje.includes('modalidad')) {
+      return this.mostrarModalidades(userId)
+    }
+
+    if (mensaje.includes('5') || mensaje.includes('asesor') || mensaje.includes('humano')) {
+      this.setUsuarioState(userId, {
+        flujo_actual: 'captura_datos',
+        paso_actual: 'nombre'
+      })
+      return await this.iniciarCapturaDatos(userId)
+    }
+
+    // Si no entiende, mostrar el proceso de admisión con menú
+    return RESPUESTAS.proceso_admision + "\n\n" + this.mostrarMenuNavegacion()
   }
 
   // Métodos auxiliares
@@ -546,7 +594,9 @@ Escribe el número de tu opción 📝`
       mensaje += `└ Descuento: ${beca.descuento}\n\n`
     })
 
-    mensaje += `¿Quieres saber sobre becas para una carrera específica?`
+    mensaje += `¿Quieres saber sobre becas para una carrera específica?\n\n`
+    
+    mensaje += this.mostrarMenuNavegacion()
     
     this.setUsuarioState(userId, {
       flujo_actual: 'menu_principal',
@@ -573,7 +623,9 @@ Escribe el número de tu opción 📝`
     mensaje += `• Total flexibilidad horaria\n`
     mensaje += `• Mismo título universitario\n\n`
 
-    mensaje += `¿Qué modalidad te conviene más?`
+    mensaje += `¿Qué modalidad te conviene más?\n\n`
+
+    mensaje += this.mostrarMenuNavegacion()
 
     this.setUsuarioState(userId, {
       flujo_actual: 'menu_principal',
@@ -637,8 +689,11 @@ Escribe el número de tu opción 📝`
         console.error('💥 Error guardando solicitud de asesor:', error)
       }
 
-      // Resetear usuario y finalizar
-      this.resetUsuario(userId)
+      // Mantener en menu principal en lugar de resetear
+      this.setUsuarioState(userId, {
+        flujo_actual: 'menu_principal',
+        paso_actual: null
+      })
 
       return `✅ **¡Perfecto, ${datos.nombre}!**
 
@@ -685,7 +740,9 @@ Un asesor especializado te contactará para:
       
       const resultado = await guardarProspecto({
         ...datos,
-        whatsapp: userId
+        whatsapp: userId,
+        carrera_interes: state.carrera_seleccionada || datos.carrera_interes,
+        facultad_interes: state.facultad_seleccionada
       })
 
       if (resultado.success) {
@@ -696,7 +753,9 @@ Un asesor especializado te contactará para:
         if (typeof (global as any).agregarProspecto === 'function') {
           (global as any).agregarProspecto({
             ...datos,
-            whatsapp: userId
+            whatsapp: userId,
+            carrera_interes: state.carrera_seleccionada || datos.carrera_interes,
+            facultad_interes: state.facultad_seleccionada
           })
         }
       }
@@ -706,12 +765,18 @@ Un asesor especializado te contactará para:
       if (typeof (global as any).agregarProspecto === 'function') {
         (global as any).agregarProspecto({
           ...datos,
-          whatsapp: userId
+          whatsapp: userId,
+          carrera_interes: state.carrera_seleccionada || datos.carrera_interes,
+          facultad_interes: state.facultad_seleccionada
         })
       }
     }
 
-    this.resetUsuario(userId)
+    // Mantener en menu principal en lugar de resetear
+    this.setUsuarioState(userId, {
+      flujo_actual: 'menu_principal',
+      paso_actual: null
+    })
 
     return `✅ **¡Perfecto, ${datos.nombre}!**
 
@@ -764,6 +829,43 @@ Metro Salvador (Línea 1)
     return emailRegex.test(email.trim())
   }
 
+  private buscarFacultadPorCarrera(nombreCarrera: string): { id: string; nombre: string } | null {
+    const carreraLimpia = nombreCarrera.toLowerCase().trim()
+    
+    // Buscar en todas las facultades
+    for (const facultadId of Object.keys(FACULTADES_UNIACC)) {
+      const facultad = FACULTADES_UNIACC[facultadId]
+      
+      // Buscar si alguna carrera coincide
+      const carreraEncontrada = facultad.carreras.find(carrera => 
+        carrera.nombre.toLowerCase().includes(carreraLimpia) ||
+        carreraLimpia.includes(carrera.nombre.toLowerCase()) ||
+        carrera.id.toLowerCase() === carreraLimpia
+      )
+      
+      if (carreraEncontrada) {
+        return {
+          id: facultadId,
+          nombre: facultad.nombre
+        }
+      }
+    }
+    
+    return null
+  }
+
+  private mostrarMenuNavegacion(): string {
+    return `📱 **¿QUÉ MÁS QUIERES SABER?**
+
+1️⃣ **Conocer nuestras carreras**
+2️⃣ **Proceso de admisión 2025**  
+3️⃣ **Costos y becas**
+4️⃣ **Modalidades de estudio**
+5️⃣ **Hablar con un asesor**
+
+Escribe el número de tu opción 📝`
+  }
+
   // Método para obtener datos del prospecto (para webhook)
   getProspectoData(userId: string) {
     const state = this.getUsuarioState(userId)
@@ -771,6 +873,8 @@ Metro Salvador (Línea 1)
       whatsapp: userId,
       source: 'uniacc_chatbot',
       timestamp: new Date().toISOString(),
+      carrera_interes: state.carrera_seleccionada || state.datos_prospecto.carrera_interes,
+      facultad_interes: state.facultad_seleccionada,
       ...state.datos_prospecto
     }
   }

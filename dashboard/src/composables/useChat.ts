@@ -50,7 +50,7 @@ export function useChat() {
       error.value = null
 
       // Cargar conversaciones desde el chatbot
-      const response = await fetch('http://localhost:3006/api/conversaciones')
+      const response = await fetch('http://localhost:3002/api/conversaciones')
       const result = await response.json()
 
       if (result.success && result.data) {
@@ -80,7 +80,7 @@ export function useChat() {
       }
 
       // Cargar mensajes desde el chatbot
-      const response = await fetch(`http://localhost:3006/api/conversaciones/${sessionId}/mensajes`)
+      const response = await fetch(`http://localhost:3002/api/conversaciones/${sessionId}/mensajes`)
       const result = await response.json()
 
       if (result.success && result.data) {

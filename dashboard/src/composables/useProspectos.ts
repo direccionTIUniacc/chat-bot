@@ -50,7 +50,7 @@ export function useProspectos() {
       await new Promise(resolve => setTimeout(resolve, 500))
 
       // Consultar datos del bot
-      const response = await fetch('http://localhost:3006/api/prospectos')
+      const response = await fetch('http://localhost:3002/api/prospectos')
       const result = await response.json()
 
       let filteredData: Prospecto[] = []

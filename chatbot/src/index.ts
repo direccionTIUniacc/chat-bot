@@ -35,7 +35,7 @@ app.use(cors({
     'http://localhost:3000', 'http://127.0.0.1:3000',
     'http://localhost:3009', 'http://127.0.0.1:3009',
     'http://localhost:3001', 'http://127.0.0.1:3001',
-    'http://localhost:3006', 'http://127.0.0.1:3006'
+    'http://localhost:3002', 'http://127.0.0.1:3002'
   ],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
@@ -261,6 +261,42 @@ app.get('/', (req: Request, res: Response) => {
     <style>
         .chat-message { animation: fadeIn 0.3s ease-in; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        
+        /* WhatsApp-like chat background */
+        .chat-background {
+            background-color: #f0f2f5;
+            background-image: radial-gradient(circle at 1px 1px, rgba(255,255,255,.15) 1px, transparent 0);
+            background-size: 20px 20px;
+        }
+        
+        /* Message bubbles */
+        .message-bubble-user {
+            background: #dcf8c6;
+            border-radius: 7.5px;
+            border-bottom-right-radius: 0;
+            box-shadow: 0 1px 0.5px rgba(0, 0, 0, 0.13);
+            max-width: 70%;
+            margin-left: auto;
+            padding: 8px 12px;
+            margin-bottom: 8px;
+        }
+        
+        .message-bubble-bot {
+            background: white;
+            border-radius: 7.5px;
+            border-bottom-left-radius: 0;
+            box-shadow: 0 1px 0.5px rgba(0, 0, 0, 0.13);
+            max-width: 70%;
+            margin-right: auto;
+            padding: 8px 12px;
+            margin-bottom: 8px;
+        }
+        
+        .message-time {
+            color: #667781;
+            font-size: 11px;
+            margin-top: 4px;
+        }
     </style>
 </head>
 <body class="bg-gray-100 min-h-screen">
@@ -285,25 +321,30 @@ app.get('/', (req: Request, res: Response) => {
                 </button>
             </div>
 
-            <!-- Interactive Chat -->
+            <!-- Interactive Chat Title -->
             <div class="border-t pt-6">
                 <h3 class="text-xl font-semibold mb-4">💬 Chat Interactivo</h3>
-                <div class="flex gap-2 mb-4">
-                    <input type="text" id="messageInput" placeholder="Escribe un mensaje (ej: hola)" 
-                           class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    <button onclick="sendMessage()" class="bg-blue-500 hover:bg-blue-600 text-white px-6 py-2 rounded-lg font-semibold transition-colors">
-                        Enviar
-                    </button>
+            </div>
+        </div>
+
+        <!-- Chat Area -->
+        <div class="bg-white border-x border-gray-200 h-96 flex flex-col">
+            <!-- Chat Messages -->
+            <div id="results" class="flex-1 overflow-y-auto p-4 space-y-3 chat-background">
+                <div class="text-gray-500 text-center py-4">
+                    👆 Haz clic en uno de los botones de arriba para comenzar la demostración
                 </div>
             </div>
         </div>
 
-        <!-- Results Area -->
-        <div class="bg-white p-6 rounded-b-lg border-x border-b border-gray-200">
-            <div id="results" class="space-y-4">
-                <div class="text-gray-500 text-center py-8">
-                    👆 Haz clic en uno de los botones de arriba para comenzar la demostración
-                </div>
+        <!-- Chat Input - Debajo del chat -->
+        <div class="bg-white rounded-b-lg border-x border-b border-gray-200 p-4">
+            <div class="flex gap-2">
+                <input type="text" id="messageInput" placeholder="Escribe un mensaje (ej: hola)" 
+                       class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <button onclick="sendMessage()" class="bg-blue-500 hover:bg-blue-600 text-white px-6 py-2 rounded-lg font-semibold transition-colors">
+                    Enviar
+                </button>
             </div>
         </div>
 
@@ -377,11 +418,18 @@ app.get('/', (req: Request, res: Response) => {
                 \`;
             } else if (type === 'chat') {
                 div.innerHTML = \`
-                    <div class="border-l-4 border-green-500 pl-3">
-                        <div class="text-sm font-semibold text-gray-600">Usuario: \${data.conversation.user_message}</div>
-                        <div class="text-sm whitespace-pre-line mt-1">\${data.conversation.bot_response}</div>
+                    <div class="space-y-2">
+                        <div class="message-bubble-user">
+                            <div class="text-sm text-gray-800">\${data.conversation.user_message}</div>
+                            <div class="message-time text-right">Tú</div>
+                        </div>
+                        <div class="message-bubble-bot">
+                            <div class="text-sm text-gray-800 whitespace-pre-line">\${data.conversation.bot_response}</div>
+                            <div class="message-time">ChatBot UNIACC 🤖</div>
+                        </div>
                     </div>
                 \`;
+                div.className = '';  // Remove border styling for chat messages
             } else {
                 div.innerHTML = \`
                     <h4 class="font-semibold text-purple-600 mb-2">\${title}</h4>
@@ -390,7 +438,10 @@ app.get('/', (req: Request, res: Response) => {
             }
             
             resultsDiv.appendChild(div);
-            div.scrollIntoView({ behavior: 'smooth' });
+            // Normal scroll to bottom
+            setTimeout(() => {
+                resultsDiv.scrollTop = resultsDiv.scrollHeight;
+            }, 100);
         }
 
         async function runDemo() {
@@ -554,6 +605,9 @@ app.post('/test-chat', async (req: Request, res: Response) => {
         telefono: prospectoData.telefono,
         whatsapp: phone,
         carrera_interes: prospectoData.carrera_interes,
+        facultad_interes: prospectoData.facultad_interes,
+        edad: prospectoData.edad,
+        region: prospectoData.region,
         nivel_interes: 'alto',
         source: 'demo_chatbot'
       })

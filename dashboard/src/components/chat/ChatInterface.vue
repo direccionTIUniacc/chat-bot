@@ -193,10 +193,10 @@
       <div 
         v-if="chat.conversacionActiva.value"
         ref="mensajesContainer"
-        class="flex-1 overflow-y-auto p-4 space-y-4"
+        class="flex-1 overflow-y-auto p-4 space-y-3 flex flex-col-reverse chat-background messages-container"
       >
         <div
-          v-for="mensaje in mensajesActivos"
+          v-for="mensaje in mensajesActivosReversed"
           :key="mensaje.id"
           :class="[
             'flex',
@@ -208,18 +208,18 @@
             v-if="mensaje.type === 'user'"
             class="max-w-xs lg:max-w-md"
           >
-            <div class="bg-blue-500 text-white rounded-lg px-4 py-2">
-              <p class="text-sm">{{ mensaje.content }}</p>
+            <div class="message-bubble-user px-3 py-2">
+              <p class="text-sm text-gray-800 whitespace-pre-wrap leading-5">{{ mensaje.content }}</p>
+              <div class="flex items-center justify-end mt-1 space-x-1">
+                <span class="message-time">
+                  {{ formatearHora(mensaje.timestamp) }}
+                </span>
+                <component 
+                  :is="getStatusIcon(mensaje.status)" 
+                  class="w-3 h-3 text-gray-500"
+                />
+              </div>
             </div>
-                         <div class="flex items-center justify-end mt-1 space-x-1">
-               <span class="text-xs text-gray-500">
-                 {{ formatearHora(mensaje.timestamp) }}
-               </span>
-               <component 
-                 :is="getStatusIcon(mensaje.status)" 
-                 class="w-3 h-3 text-gray-400"
-               />
-             </div>
           </div>
 
           <!-- Mensaje del bot o ejecutivo -->
@@ -242,30 +242,26 @@
 
               <!-- Contenido del mensaje -->
               <div>
-                <div 
-                  :class="[
-                    'rounded-lg px-4 py-2',
-                    mensaje.type === 'bot' ? 'bg-gray-100 text-gray-800' : 'bg-green-100 text-green-800'
-                  ]"
-                >
-                  <p class="text-sm">{{ mensaje.content }}</p>
+                <div class="message-bubble-other px-3 py-2">
+                  <p class="text-sm text-gray-800 whitespace-pre-wrap leading-5">{{ mensaje.content }}</p>
+                  <div class="flex items-center justify-between mt-1">
+                    <div class="flex items-center space-x-1">
+                      <span class="message-time">
+                        {{ mensaje.sender_name || (mensaje.type === 'bot' ? 'ChatBot UNIACC' : 'Ejecutivo') }}
+                      </span>
+                      <span 
+                        v-if="mensaje.type === 'bot'"
+                        class="text-xs"
+                        title="Mensaje automático"
+                      >
+                        🤖
+                      </span>
+                    </div>
+                    <span class="message-time">
+                      {{ formatearHora(mensaje.timestamp) }}
+                    </span>
+                  </div>
                 </div>
-                                 <div class="flex items-center mt-1 space-x-1">
-                   <span class="text-xs text-gray-500">
-                     {{ mensaje.sender_name || (mensaje.type === 'bot' ? 'ChatBot' : 'Ejecutivo') }}
-                   </span>
-                   <span class="text-xs text-gray-400">•</span>
-                   <span class="text-xs text-gray-500">
-                     {{ formatearHora(mensaje.timestamp) }}
-                   </span>
-                   <span 
-                     v-if="mensaje.is_automated"
-                     class="text-xs text-blue-500"
-                     title="Mensaje automático"
-                   >
-                     🤖
-                   </span>
-                 </div>
               </div>
             </div>
           </div>
@@ -276,15 +272,22 @@
           v-if="usuariosEscribiendoActivos.length > 0"
           class="flex justify-start"
         >
-          <div class="max-w-xs lg:max-w-md">
-            <div class="bg-gray-100 rounded-lg px-4 py-2">
-              <div class="flex items-center space-x-1">
+          <div class="max-w-xs lg:max-w-md flex items-start space-x-2">
+            <!-- Avatar pequeño -->
+            <div class="flex-shrink-0">
+              <div class="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-xs">
+                ✍️
+              </div>
+            </div>
+            <!-- Burbuja de "escribiendo" -->
+            <div class="message-bubble-other px-3 py-2">
+              <div class="flex items-center space-x-2">
                 <div class="flex space-x-1">
                   <div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
                   <div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-100"></div>
                   <div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-200"></div>
                 </div>
-                <span class="text-xs text-gray-500 ml-2">escribiendo...</span>
+                <span class="text-xs text-gray-500">escribiendo...</span>
               </div>
             </div>
           </div>
@@ -294,27 +297,30 @@
       <!-- Panel de escritura -->
       <div 
         v-if="chat.conversacionActiva.value"
-        class="p-4 border-t border-gray-200"
+        class="p-4 bg-gray-50 border-t border-gray-200"
       >
-        <form @submit.prevent="enviarMensaje" class="flex space-x-3">
-          <input
-            v-model="nuevoMensaje"
-            @input="manejarEscritura"
-            type="text"
-            placeholder="Escribe tu mensaje..."
-            class="flex-1 input-field"
-            :disabled="!puedeResponder"
-          />
+        <form @submit.prevent="enviarMensaje" class="flex items-end space-x-3">
+          <div class="flex-1">
+            <input
+              v-model="nuevoMensaje"
+              @input="manejarEscritura"
+              type="text"
+              placeholder="Escribe un mensaje..."
+              class="w-full px-4 py-3 bg-white border border-gray-300 rounded-full focus:outline-none focus:border-green-500 text-sm"
+              :disabled="!puedeResponder"
+            />
+          </div>
           <button
             type="submit"
-            class="btn-primary"
+            class="w-12 h-12 bg-green-500 hover:bg-green-600 text-white rounded-full flex items-center justify-center transition-colors duration-200 disabled:bg-gray-300 disabled:cursor-not-allowed"
             :disabled="!nuevoMensaje.trim() || !puedeResponder"
+            title="Enviar mensaje"
           >
-            <Send class="w-4 h-4" />
+            <Send class="w-5 h-5" />
           </button>
         </form>
         
-        <p v-if="!puedeResponder" class="text-xs text-amber-600 mt-2">
+        <p v-if="!puedeResponder" class="text-xs text-amber-600 mt-2 text-center">
           ⚠️ Esta conversación debe ser asignada a un ejecutivo para poder responder
         </p>
       </div>
@@ -384,6 +390,10 @@ const mensajesActivos = computed(() => {
   return chat.mensajes.value[chat.conversacionActiva.value.id] || []
 })
 
+const mensajesActivosReversed = computed(() => {
+  return [...mensajesActivos.value].reverse()
+})
+
 const usuariosEscribiendoActivos = computed(() => {
   if (!chat.conversacionActiva.value) return []
   return chat.usuariosEscribiendo.value[chat.conversacionActiva.value.id] || []
@@ -445,7 +455,8 @@ const manejarEscritura = () => {
 const scrollToBottom = async () => {
   await nextTick()
   if (mensajesContainer.value) {
-    mensajesContainer.value.scrollTop = mensajesContainer.value.scrollHeight
+    // Con flex-col-reverse, scroll a 0 es el "bottom" visual
+    mensajesContainer.value.scrollTop = 0
   }
 }
 
@@ -513,6 +524,50 @@ onMounted(async () => {
 </script>
 
 <style scoped>
+/* Chat interface similar to WhatsApp */
+.flex-col-reverse {
+  display: flex;
+  flex-direction: column-reverse;
+}
+
+/* Background pattern like WhatsApp */
+.chat-background {
+  background-color: #f0f2f5;
+  background-image: 
+    radial-gradient(circle at 1px 1px, rgba(255,255,255,.15) 1px, transparent 0);
+  background-size: 20px 20px;
+}
+
+/* Message bubbles */
+.message-bubble-user {
+  background: #dcf8c6;
+  border-radius: 7.5px;
+  border-bottom-right-radius: 0;
+  box-shadow: 0 1px 0.5px rgba(0, 0, 0, 0.13);
+  position: relative;
+}
+
+.message-bubble-other {
+  background: white;
+  border-radius: 7.5px;
+  border-bottom-left-radius: 0;
+  box-shadow: 0 1px 0.5px rgba(0, 0, 0, 0.13);
+  position: relative;
+}
+
+/* WhatsApp-like timestamp */
+.message-time {
+  color: #667781;
+  font-size: 11px;
+  line-height: 15px;
+  margin-top: 2px;
+}
+
+/* Scroll behavior */
+.messages-container {
+  scroll-behavior: smooth;
+}
+
 .animate-bounce {
   animation: bounce 1.4s infinite;
 }

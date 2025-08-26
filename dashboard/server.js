@@ -3,7 +3,7 @@ const cors = require('cors')
 const { createClient } = require('@supabase/supabase-js')
 
 const app = express()
-const PORT = 3006 // Puerto para API (dashboard frontend está en 3000)
+const PORT = 3002 // Puerto para API (dashboard frontend está en 3000)
 
 // Middleware
 app.use(cors())

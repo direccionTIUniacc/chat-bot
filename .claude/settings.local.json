@@ -4,7 +4,8 @@
       "Bash(npm run dev:full:*)",
       "Bash(taskkill:*)",
       "Bash(cat:*)",
-      "Bash(powershell:*)"
+      "Bash(powershell:*)",
+      "Bash(npm start)"
     ],
     "deny": [],
     "ask": []

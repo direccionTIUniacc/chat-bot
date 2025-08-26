@@ -6,7 +6,7 @@
         <div class="flex items-center">
           <div class="flex-shrink-0">
             <h1 class="text-xl font-bold text-gradient">
-              UNIACC ChatBot Dashboard
+              Dashboard
             </h1>
           </div>
         </div>

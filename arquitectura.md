@@ -524,4 +524,4 @@ tail -f chatbot/logs/bot.log
 
 **Última actualización:** 26 de Agosto, 2025  
 **Versión:** 1.0.0  
-**Autor:** Claude Code AI  
+**Autor:** Juan Pablo Silva feat Claude AI

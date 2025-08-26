@@ -5,7 +5,10 @@ export interface ProspectoData {
   email: string
   telefono: string
   whatsapp: string
+  edad?: number
+  region?: string
   carrera_interes?: string
+  facultad_interes?: string
   nivel_interes?: string
   source: string
   utm_source?: string
@@ -109,7 +112,7 @@ export class SupabaseIntegration {
       }
 
       // Enviar a endpoint de interacciones (si existe)
-      const interaccionUrl = this.webhookUrl.replace('/api/botpress-webhook', '/api/interacciones')
+      const interaccionUrl = this.webhookUrl.replace('/api/prospectos', '/api/interacciones')
       
       await axios.post(interaccionUrl, payload, {
         headers: {

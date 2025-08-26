@@ -10,9 +10,27 @@ export default defineConfig({
     }
   },
   server: {
-    port: 3000,
+    port: process.env.VITE_PORT ? parseInt(process.env.VITE_PORT) : 3000,
     open: true,
-    host: true
+    host: true,
+    proxy: {
+      '/api': {
+        target: 'http://localhost:3006',
+        changeOrigin: true,
+        secure: false,
+        configure: (proxy, options) => {
+          proxy.on('error', (err, req, res) => {
+            console.log('🔴 Proxy error:', err.message);
+          });
+          proxy.on('proxyReq', (proxyReq, req, res) => {
+            console.log('🔄 Proxying:', req.method, req.url, '-> localhost:3006' + req.url);
+          });
+          proxy.on('proxyRes', (proxyRes, req, res) => {
+            console.log('✅ Proxy response:', proxyRes.statusCode, req.url);
+          });
+        }
+      }
+    }
   },
   build: {
     target: 'esnext',

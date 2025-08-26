@@ -31,7 +31,12 @@ app.use(helmet({
   },
 }))
 app.use(cors({
-  origin: ['http://localhost:3000', 'http://127.0.0.1:3000'],
+  origin: [
+    'http://localhost:3000', 'http://127.0.0.1:3000',
+    'http://localhost:3009', 'http://127.0.0.1:3009',
+    'http://localhost:3001', 'http://127.0.0.1:3001',
+    'http://localhost:3006', 'http://127.0.0.1:3006'
+  ],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
@@ -50,7 +55,11 @@ const supabaseIntegration = new SupabaseIntegration(
   process.env.VUE_WEBHOOK_SECRET!
 )
 
-const uniaccBot = new UniaccBot()
+// Crear instancia del bot con configuración de webhook
+const uniaccBot = new UniaccBot(
+  process.env.VUE_WEBHOOK_URL!,
+  process.env.VUE_WEBHOOK_SECRET!
+)
 
 // 💾 Base de datos en memoria para el MVP
 const prospectos: any[] = []
@@ -198,8 +207,8 @@ app.post('/webhook', async (req: Request, res: Response) => {
       return res.status(500).json({ error: 'Error enviando respuesta' })
     }
 
-    // ✅ Las interacciones se registran solo localmente por ahora
-    // await supabaseIntegration.registrarInteraccion(from, message, respuesta)
+    // ✅ Registrar interacciones en Supabase
+    await supabaseIntegration.registrarInteraccion(from, message, respuesta)
 
     // Si el usuario completó la captura de datos, enviar al dashboard
     // ✅ Los prospectos ahora se guardan directamente en uniacc-scripts.ts
@@ -528,7 +537,7 @@ app.post('/test-chat', async (req: Request, res: Response) => {
     // Procesar mensaje con el bot UNIACC
     const respuestaBbot = await uniaccBot.procesarMensaje(phone, message)
 
-    // Simular registro de interacción
+    // Registro de interacción
     await supabaseIntegration.registrarInteraccion(phone, message, respuestaBbot)
 
     // Verificar si se completó captura de datos

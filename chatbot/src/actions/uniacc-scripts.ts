@@ -1,5 +1,6 @@
 import { FACULTADES_UNIACC, getFacultadById, getCarreraById, BECAS_UNIACC } from '../data/programas-uniacc'
 import { RESPUESTAS } from '../data/respuestas-predefinidas'
+import { SupabaseIntegration, ProspectoData } from './supabase-integration'
 
 export interface UsuarioState {
   flujo_actual: string | null
@@ -8,6 +9,8 @@ export interface UsuarioState {
     nombre?: string
     email?: string
     telefono?: string
+    edad?: number
+    region?: string
     carrera_interes?: string
     nivel_interes?: string
     campus_preferido?: string
@@ -19,6 +22,11 @@ export interface UsuarioState {
 
 export class UniaccBot {
   private usuarios: Map<string, UsuarioState> = new Map()
+  private supabaseIntegration: SupabaseIntegration
+
+  constructor(webhookUrl: string, webhookSecret: string) {
+    this.supabaseIntegration = new SupabaseIntegration(webhookUrl, webhookSecret)
+  }
 
   private getUsuarioState(userId: string): UsuarioState {
     if (!this.usuarios.has(userId)) {
@@ -46,7 +54,7 @@ export class UniaccBot {
     })
   }
 
-  // Método principal para procesar mensajes
+  // Método principal para procesar mensajes - actualizado
   async procesarMensaje(userId: string, mensaje: string): Promise<string> {
     const state = this.getUsuarioState(userId)
     const textoLimpio = mensaje.toLowerCase().trim()
@@ -60,20 +68,23 @@ export class UniaccBot {
 
     // Procesar según el flujo actual
     switch (state.flujo_actual) {
+      case 'captura_inicial':
+        return await this.procesarCapturaInicial(userId, mensaje)
+      
       case 'menu_principal':
-        return this.procesarMenuPrincipal(userId, textoLimpio)
+        return await this.procesarMenuPrincipal(userId, textoLimpio)
       
       case 'exploracion_carreras':
         return this.procesarExploracionCarreras(userId, textoLimpio)
       
       case 'detalle_carrera':
-        return this.procesarDetalleCarrera(userId, textoLimpio)
+        return await this.procesarDetalleCarrera(userId, textoLimpio)
       
       case 'captura_datos':
         return await this.procesarCapturaDatos(userId, textoLimpio)
       
       case 'proceso_admision':
-        return this.procesarProcesoAdmision(userId, textoLimpio)
+        return await this.procesarProcesoAdmision(userId, textoLimpio)
       
       default:
         return this.manejarNoEntendido(userId)
@@ -83,13 +94,165 @@ export class UniaccBot {
   private iniciarConversacion(userId: string): string {
     this.resetUsuario(userId)
     this.setUsuarioState(userId, {
-      flujo_actual: 'menu_principal',
-      paso_actual: 'inicio'
+      flujo_actual: 'captura_inicial',
+      paso_actual: 'solicitar_nombre'
     })
-    return RESPUESTAS.bienvenida
+    return `🎓 ¡Hola! Para brindarte información personalizada sobre UNIACC:
+
+👤 ¿Cuál es tu **nombre completo**?`
   }
 
-  private procesarMenuPrincipal(userId: string, mensaje: string): string {
+  private async procesarCapturaInicial(userId: string, mensaje: string): Promise<string> {
+    const state = this.getUsuarioState(userId)
+    
+    switch (state.paso_actual) {
+      case 'solicitar_nombre':
+        // Guardar nombre y solicitar email
+        this.setUsuarioState(userId, {
+          datos_prospecto: { ...state.datos_prospecto, nombre: mensaje },
+          paso_actual: 'solicitar_email'
+        })
+        return `¡Hola ${mensaje}! 👋
+
+📧 ¿Cuál es tu **email**?`
+
+      case 'solicitar_email':
+        // Validar email básicamente y guardarlo
+        if (!mensaje.includes('@') || !mensaje.includes('.')) {
+          return `❌ Por favor ingresa un email válido (debe contener @ y .)`
+        }
+        
+        this.setUsuarioState(userId, {
+          datos_prospecto: { ...state.datos_prospecto, email: mensaje },
+          paso_actual: 'solicitar_edad'
+        })
+        return `✅ Email: ${mensaje}
+
+🎂 ¿Cuántos **años** tienes?`
+
+      case 'solicitar_edad':
+        const edad = parseInt(mensaje)
+        if (isNaN(edad) || edad < 16 || edad > 80) {
+          return `❌ Por favor ingresa una edad válida (entre 16 y 80 años)`
+        }
+        
+        this.setUsuarioState(userId, {
+          datos_prospecto: { ...state.datos_prospecto, edad },
+          paso_actual: 'solicitar_region'
+        })
+        return `✅ Edad: ${edad} años
+
+📍 ¿En qué **región** vives?
+
+1️⃣ Arica y Parinacota
+2️⃣ Tarapacá  
+3️⃣ Antofagasta
+4️⃣ Atacama
+5️⃣ Coquimbo
+6️⃣ Valparaíso
+7️⃣ Metropolitana
+8️⃣ O'Higgins
+9️⃣ Maule
+🔟 Ñuble
+1️⃣1️⃣ Biobío
+1️⃣2️⃣ La Araucanía
+1️⃣3️⃣ Los Ríos
+1️⃣4️⃣ Los Lagos
+1️⃣5️⃣ Aysén
+1️⃣6️⃣ Magallanes
+
+Escribe el **número** de tu región:`
+
+      case 'solicitar_region':
+        const regiones = [
+          'Arica y Parinacota', 'Tarapacá', 'Antofagasta', 'Atacama', 'Coquimbo',
+          'Valparaíso', 'Metropolitana', 'O\'Higgins', 'Maule', 'Ñuble',
+          'Biobío', 'La Araucanía', 'Los Ríos', 'Los Lagos', 'Aysén', 'Magallanes'
+        ]
+        
+        const numeroRegion = parseInt(mensaje)
+        if (isNaN(numeroRegion) || numeroRegion < 1 || numeroRegion > 16) {
+          return `❌ Por favor selecciona un número válido del 1 al 16`
+        }
+        
+        const regionSeleccionada = regiones[numeroRegion - 1]
+        this.setUsuarioState(userId, {
+          datos_prospecto: { ...state.datos_prospecto, region: regionSeleccionada },
+          paso_actual: 'solicitar_telefono'
+        })
+        return `✅ Región: ${regionSeleccionada}
+
+📱 Por último, ¿cuál es tu **teléfono**?`
+
+      case 'solicitar_telefono':
+        // Validación básica de teléfono
+        const telefonoLimpio = mensaje.replace(/\s/g, '')
+        if (telefonoLimpio.length < 8) {
+          return `❌ Por favor ingresa un número de teléfono válido`
+        }
+        
+        const datos = state.datos_prospecto
+        
+        // Guardar el prospecto en Supabase
+        try {
+          const prospectoData: ProspectoData = {
+            nombre: datos.nombre!,
+            email: datos.email!,
+            telefono: mensaje,
+            whatsapp: userId, // El userId es el número de WhatsApp
+            edad: datos.edad,
+            region: datos.region,
+            source: 'whatsapp_bot'
+          }
+
+          console.log('💾 Guardando prospecto:', prospectoData.nombre)
+          const resultado = await this.supabaseIntegration.enviarProspecto(prospectoData)
+          
+          if (resultado.success) {
+            console.log('✅ Prospecto guardado exitosamente:', resultado.prospectoId)
+          } else {
+            console.error('❌ Error guardando prospecto:', resultado.error)
+          }
+        } catch (error) {
+          console.error('💥 Error al procesar prospecto:', error)
+        }
+        
+        this.setUsuarioState(userId, {
+          datos_prospecto: { ...datos, telefono: mensaje },
+          flujo_actual: 'menu_principal',
+          paso_actual: null
+        })
+        
+        return `🎉 **¡PERFECTO ${datos.nombre?.toUpperCase()}!**
+
+📋 **Tus datos:**
+👤 ${datos.nombre}
+📧 ${datos.email}
+🎂 ${datos.edad} años  
+📍 ${datos.region}
+📱 ${mensaje}
+
+---
+
+🌟 **¡Bienvenid@ a UNIACC!** 🌟
+*Universidad de Artes, Ciencias y Comunicaciones*
+
+¿En qué puedo ayudarte hoy?
+
+1️⃣ **Conocer nuestras carreras**
+2️⃣ **Proceso de admisión 2025**  
+3️⃣ **Costos y becas**
+4️⃣ **Modalidades de estudio**
+5️⃣ **Hablar con un asesor**
+
+Escribe el número de tu opción 📝`
+
+      default:
+        return this.iniciarConversacion(userId)
+    }
+  }
+
+  private async procesarMenuPrincipal(userId: string, mensaje: string): Promise<string> {
     if (mensaje.includes('1') || mensaje.includes('carrera')) {
       this.setUsuarioState(userId, {
         flujo_actual: 'exploracion_carreras',
@@ -119,7 +282,7 @@ export class UniaccBot {
         flujo_actual: 'captura_datos',
         paso_actual: 'nombre'
       })
-      return this.iniciarCapturaDatos(userId)
+      return await this.iniciarCapturaDatos(userId)
     }
 
     return this.manejarNoEntendido(userId)
@@ -183,7 +346,7 @@ export class UniaccBot {
     return this.manejarNoEntendido(userId)
   }
 
-  private procesarDetalleCarrera(userId: string, mensaje: string): string {
+  private async procesarDetalleCarrera(userId: string, mensaje: string): Promise<string> {
     if (mensaje.includes('mas') || mensaje.includes('información') || mensaje.includes('info')) {
       return this.mostrarInformacionAdicional(userId)
     }
@@ -193,7 +356,7 @@ export class UniaccBot {
         flujo_actual: 'captura_datos',
         paso_actual: 'nombre'
       })
-      return this.iniciarCapturaDatos(userId)
+      return await this.iniciarCapturaDatos(userId)
     }
 
     if (mensaje.includes('otra') || mensaje.includes('menu') || mensaje.includes('volver')) {
@@ -216,32 +379,58 @@ export class UniaccBot {
         if (mensaje.length >= 2) {
           this.setUsuarioState(userId, {
             datos_prospecto: { ...state.datos_prospecto, nombre: mensaje },
-            paso_actual: 'email'
+            paso_actual: 'telefono'
           })
           return `¡Hola ${mensaje}! 👋
 
-📧 ¿Cuál es tu **email**?`
+📱 ¿Cuál es tu **número de teléfono móvil**?`
         } else {
           return 'Por favor, ingresa tu nombre completo'
-        }
-
-      case 'email':
-        if (this.validarEmail(mensaje)) {
-          this.setUsuarioState(userId, {
-            datos_prospecto: { ...state.datos_prospecto, email: mensaje },
-            paso_actual: 'telefono'
-          })
-          return '📱 ¿Tu **número de teléfono**?'
-        } else {
-          return '📧 Email inválido. Ejemplo: juan@gmail.com'
         }
 
       case 'telefono':
         this.setUsuarioState(userId, {
           datos_prospecto: { ...state.datos_prospecto, telefono: mensaje },
-          paso_actual: 'carrera_interes'
+          paso_actual: 'confirmar_telefono'
         })
-        return '🎓 ¿Qué **carrera te interesa**? (puedes escribir el nombre)'
+        return `📱 **Teléfono confirmado:** ${mensaje}
+
+📧 Ahora, ¿cuál es tu **email**?`
+
+      case 'confirmar_telefono':
+        this.setUsuarioState(userId, {
+          datos_prospecto: { ...state.datos_prospecto, telefono: mensaje },
+          paso_actual: 'email'
+        })
+        return `📱 **Teléfono confirmado:** ${mensaje}
+
+📧 Ahora, ¿cuál es tu **email**?`
+
+      case 'email':
+        if (this.validarEmail(mensaje)) {
+          this.setUsuarioState(userId, {
+            datos_prospecto: { ...state.datos_prospecto, email: mensaje },
+            paso_actual: 'confirmar_email'
+          })
+          return `📧 **Email confirmado:** ${mensaje}
+
+🎓 ¿Qué **carrera te interesa**? (puedes escribir el nombre)`
+        } else {
+          return '📧 Email inválido. Ejemplo: juan@gmail.com'
+        }
+
+      case 'confirmar_email':
+        if (this.validarEmail(mensaje)) {
+          this.setUsuarioState(userId, {
+            datos_prospecto: { ...state.datos_prospecto, email: mensaje },
+            paso_actual: 'carrera_interes'
+          })
+          return `📧 **Email confirmado:** ${mensaje}
+
+🎓 ¿Qué **carrera te interesa**? (puedes escribir el nombre)`
+        } else {
+          return '📧 Email inválido. Ejemplo: juan@gmail.com'
+        }
 
       case 'carrera_interes':
         this.setUsuarioState(userId, {
@@ -255,7 +444,7 @@ export class UniaccBot {
     }
   }
 
-  private procesarProcesoAdmision(userId: string, mensaje: string): string {
+  private async procesarProcesoAdmision(userId: string, mensaje: string): Promise<string> {
     if (mensaje.includes('requisito')) {
       return `📋 **REQUISITOS DE ADMISIÓN**
 
@@ -289,7 +478,7 @@ export class UniaccBot {
         flujo_actual: 'captura_datos',
         paso_actual: 'nombre'
       })
-      return this.iniciarCapturaDatos(userId)
+      return await this.iniciarCapturaDatos(userId)
     }
 
     return this.iniciarConversacion(userId)
@@ -394,7 +583,85 @@ export class UniaccBot {
     return mensaje
   }
 
-  private iniciarCapturaDatos(userId: string): string {
+  private async iniciarCapturaDatos(userId: string): Promise<string> {
+    const state = this.getUsuarioState(userId)
+    const datos = state.datos_prospecto
+
+    // Si ya tenemos los datos básicos del usuario, finalizar directamente
+    if (datos.nombre && datos.email && datos.telefono) {
+      console.log(`✅ Usuario ${userId} ya tiene datos completos, finalizando solicitud de asesor`)
+      
+      // Obtener información de facultad y carrera si están disponibles
+      let facultadInfo = ''
+      let carreraInfo = ''
+      let carreraInteres = datos.carrera_interes || ''
+      
+      if (state.facultad_seleccionada && state.carrera_seleccionada) {
+        const facultad = getFacultadById(state.facultad_seleccionada)
+        const carrera = getCarreraById(state.facultad_seleccionada, state.carrera_seleccionada)
+        
+        if (facultad && carrera) {
+          facultadInfo = facultad.nombre
+          carreraInfo = carrera.nombre
+          carreraInteres = `${facultad.nombre} - ${carrera.nombre}`
+        }
+      } else if (state.facultad_seleccionada) {
+        const facultad = getFacultadById(state.facultad_seleccionada)
+        if (facultad) {
+          facultadInfo = facultad.nombre
+          carreraInteres = `${facultad.nombre} (explorando carreras)`
+        }
+      }
+      
+      // Guardar solicitud de asesor
+      try {
+        const prospectoData: ProspectoData = {
+          nombre: datos.nombre,
+          email: datos.email,
+          telefono: datos.telefono,
+          whatsapp: userId,
+          edad: datos.edad,
+          region: datos.region,
+          carrera_interes: carreraInfo,
+          facultad_interes: facultadInfo,
+          source: 'asesor_request'
+        }
+
+        console.log('📋 Guardando solicitud de asesor para:', datos.nombre)
+        const resultado = await this.supabaseIntegration.enviarProspecto(prospectoData)
+        
+        if (resultado.success) {
+          console.log('✅ Solicitud de asesor guardada exitosamente:', resultado.prospectoId)
+        }
+      } catch (error) {
+        console.error('💥 Error guardando solicitud de asesor:', error)
+      }
+
+      // Resetear usuario y finalizar
+      this.resetUsuario(userId)
+
+      return `✅ **¡Perfecto, ${datos.nombre}!**
+
+📧 Email: ${datos.email}
+📱 Teléfono: ${datos.telefono}
+${datos.edad ? `🎂 Edad: ${datos.edad} años` : ''}
+${datos.region ? `📍 Región: ${datos.region}` : ''}
+${carreraInfo ? `🎓 Interés: ${carreraInfo}` : facultadInfo ? `🏫 Facultad: ${facultadInfo}` : ''}
+
+**Un asesor especializado te contactará en las próximas 24 horas** para brindarte información personalizada sobre:
+${carreraInfo ? `• **${carreraInfo}** - Detalles específicos de la carrera` : ''}
+${facultadInfo && !carreraInfo ? `• **${facultadInfo}** - Carreras disponibles` : ''}
+• Proceso de admisión y requisitos
+• Becas y financiamiento disponibles
+• Modalidades de estudio y horarios
+• Visitas al campus y facilidades
+
+**¡Gracias por tu interés en UNIACC!** 🎓✨
+
+*Universidad de Artes, Ciencias y Comunicaciones*`
+    }
+
+    // Si no tenemos datos completos, iniciar captura normal
     return `📝 **Para brindarte la mejor atención personalizada**
 
 Un asesor especializado te contactará para:

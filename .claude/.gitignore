@@ -1,0 +1,15 @@
+# Claude Context - Ignorar archivos temporales
+logs/
+temp/
+*.log
+*.tmp
+
+# Node modules (si instalamos dependencias)
+node_modules/
+
+# Mantener estos archivos en Git
+!project-context.json
+!README.md
+!package.json
+!claude-init.js
+!update-context.js

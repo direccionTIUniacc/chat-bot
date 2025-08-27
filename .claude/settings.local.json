@@ -5,7 +5,8 @@
       "Bash(taskkill:*)",
       "Bash(cat:*)",
       "Bash(powershell:*)",
-      "Bash(npm start)"
+      "Bash(npm start)",
+      "Bash(npm run init:*)"
     ],
     "deny": [],
     "ask": []

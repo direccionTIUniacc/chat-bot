@@ -15,6 +15,17 @@ export const formatDateTime = (date: string | Date): string => {
   return formatDate(date, 'dd/MM/yyyy HH:mm')
 }
 
+export const formatDateTimeChile = (date: string | Date): string => {
+  try {
+    const dateObj = typeof date === 'string' ? parseISO(date) : date
+    // Convertir a hora de Chile (UTC-3 o UTC-4 según DST)
+    const chileDate = new Date(dateObj.toLocaleString("en-US", {timeZone: "America/Santiago"}))
+    return format(chileDate, 'dd/MM/yyyy HH:mm', { locale: es }) + ' (Chile)'
+  } catch {
+    return 'Fecha inválida'
+  }
+}
+
 export const formatTimeAgo = (date: string | Date): string => {
   try {
     const dateObj = typeof date === 'string' ? parseISO(date) : date
@@ -134,6 +145,32 @@ export const formatSource = (source: string): string => {
   }
   
   return sourceMap[source] || capitalizeFirst(source)
+}
+
+export const formatTipoConsulta = (tipoConsulta: string): string => {
+  if (!tipoConsulta) return 'Consulta General'
+  
+  const tipoConsultaMap: Record<string, string> = {
+    'consulta carrera': 'Consulta Carrera',
+    'consulta proceso admision': 'Consulta Proceso Admisión',
+    'consulta costos y/o becas': 'Consulta Costos y/o Becas',
+    'consulta de modalidades de estudio': 'Consulta de Modalidades de Estudio',
+    'solicitud de asesor': '🚨 Solicitud de Asesor',
+    'consulta general': 'Consulta General',
+    // Retrocompatibilidad con valores antiguos
+    'conocer_carreras': 'Consulta Carrera',
+    'proceso_admision': 'Consulta Proceso Admisión',
+    'costos_becas': 'Consulta Costos y/o Becas',
+    'modalidades_estudio': 'Consulta de Modalidades de Estudio',
+    'hablar_asesor': '🚨 Solicitud de Asesor',
+    'exploracion_carreras': 'Consulta Carrera',
+    'contacto_asesor': '🚨 Solicitud de Asesor',
+    'detalle_carrera': 'Consulta Carrera',
+    'captura_datos': '🚨 Solicitud de Asesor',
+    'menu_principal': 'Consulta General'
+  }
+  
+  return tipoConsultaMap[tipoConsulta] || 'Consulta General'
 }
 
 // Formatear duración

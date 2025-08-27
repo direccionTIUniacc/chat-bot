@@ -249,10 +249,103 @@ app.post('/api/prospectos', async (req, res) => {
   }
 })
 
-// Endpoint de botpress webhook (redirigir al existente si es necesario)
+// Mapear flujo del chatbot al tipo de consulta para la DB
+function mapearFlujoATipoConsulta(flujoActual) {
+  const mapeo = {
+    'conocer_carreras': 'consulta carrera',
+    'proceso_admision': 'consulta proceso admision', 
+    'costos_becas': 'consulta costos y/o becas',
+    'modalidades_estudio': 'consulta de modalidades de estudio',
+    'hablar_asesor': 'solicitud de asesor',
+    // Mapeos adicionales por si llegan otros flujos
+    'exploracion_carreras': 'consulta carrera',
+    'detalle_carrera': 'consulta carrera',
+    'captura_datos': 'solicitud de asesor',
+    'menu_principal': 'consulta general'
+  }
+  
+  return mapeo[flujoActual] || 'consulta general'
+}
+
+// Determinar nivel de interés basado en el tipo de consulta
+function determinarNivelInteres(tipoConsulta, nivelOriginal) {
+  if (tipoConsulta === 'solicitud de asesor') {
+    return 'urgente'
+  }
+  return nivelOriginal || 'alto'
+}
+
+// Endpoint de botpress webhook con lógica completa
 app.post('/api/botpress-webhook', async (req, res) => {
-  // Este endpoint ya existe en el dashboard, solo respondemos OK por ahora
-  res.json({ success: true, message: 'Webhook received' })
+  try {
+    // Verificar autorización
+    const authHeader = req.headers.authorization
+    const expectedToken = process.env.VITE_UNIACC_WEBHOOK_SECRET || 'uniacc_webhook_secret_123'
+    
+    if (!authHeader || authHeader.replace('Bearer ', '') !== expectedToken) {
+      return res.status(401).json({ error: 'Unauthorized' })
+    }
+
+    const eventData = req.body
+    console.log('📊 Procesando prospecto UNIACC:', eventData)
+    console.log('🔧 DEBUG - flujo_actual recibido:', eventData.flujo_actual)
+    
+    const tipoConsulta = mapearFlujoATipoConsulta(eventData.flujo_actual)
+    console.log('🔧 DEBUG - tipo_consulta mapeado:', tipoConsulta)
+
+    const { supabase } = useSupabase()
+
+    // Crear prospecto en Supabase con estructura UNIACC
+    const { data, error } = await supabase
+      .from('prospectos')
+      .insert({
+        nombre: eventData.nombre,
+        email: eventData.email,
+        telefono: eventData.telefono,
+        whatsapp: eventData.whatsapp,
+        carrera_interes: eventData.carrera_interes,
+        nivel_interes: determinarNivelInteres(tipoConsulta, eventData.nivel_interes),
+        fuente: eventData.source || 'uniacc_chatbot',
+        estado: 'nuevo',
+        campus_preferido: eventData.campus_preferido,
+        tipo_consulta: tipoConsulta,
+        created_at: new Date(eventData.timestamp || new Date().toLocaleString("en-US", {timeZone: "America/Santiago"})),
+        metadata: {
+          bot_source: 'uniacc_direct',
+          conversation_flow: eventData.flujo_actual,
+          utm_source: eventData.utm_source,
+          utm_medium: eventData.utm_medium,
+          utm_campaign: eventData.utm_campaign,
+          ...eventData.datos_adicionales
+        }
+      })
+      .select()
+      .single()
+
+    if (error) {
+      console.error('❌ Error creando prospecto UNIACC:', error)
+      return res.status(500).json({ success: false, error: error.message })
+    }
+
+    console.log('✅ Prospecto UNIACC guardado:', data.id)
+    
+    // Crear notificación para ejecutivos
+    await supabase
+      .from('notificaciones')
+      .insert({
+        tipo: 'nuevo_prospecto',
+        titulo: `Nuevo prospecto: ${data.nombre}`,
+        mensaje: `Interesado en ${data.carrera_interes || 'consulta general'}`,
+        datos: { prospecto_id: data.id },
+        created_at: new Date()
+      })
+
+    res.json({ success: true, prospecto_id: data.id, data })
+
+  } catch (error) {
+    console.error('💥 Error procesando lead UNIACC:', error)
+    res.status(500).json({ success: false, error: 'Error interno procesando prospecto' })
+  }
 })
 
 // API Endpoints missing

@@ -1,0 +1,29 @@
+{
+    "name": "@uniacc-chatbot/claude-context",
+    "version": "1.0.0",
+    "description": "Contexto y herramientas para Claude Code - UNIACC ChatBot System",
+    "scripts": {
+      "init": "node claude-init.js",
+      "update": "node update-context.js",
+      "report": "node update-context.js --report",
+      "health": "node claude-init.js --health",
+      "task": "node update-context.js --task",
+      "completed": "node update-context.js --completed",
+      "phase": "node update-context.js --phase"
+    },
+    "keywords": [
+      "claude-code",
+      "context",
+      "uniacc-chatbot",
+      "development-tools"
+    ],
+    "author": "Juan Pablo Silva",
+    "license": "MIT",
+    "engines": {
+      "node": ">=18.0.0"
+    },
+    "dependencies": {
+      "fs": "*",
+      "path": "*"
+    }
+  }

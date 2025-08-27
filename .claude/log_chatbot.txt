@@ -1,0 +1,180 @@
+uniacc\chatbot> npm run dev
+
+> uniacc-whatsapp-bot-direct@1.0.0 dev
+> nodemon -r tsconfig-paths/register src/index.ts
+
+[nodemon] 3.1.10
+[nodemon] to restart at any time, enter `rs`
+[nodemon] watching path(s): *.*
+[nodemon] watching extensions: ts,json
+[nodemon] starting `ts-node -r tsconfig-paths/register src/index.ts`
+[dotenv@17.2.1] injecting env (16) from .env -- tip: 📡 auto-backup env with Radar: https://dotenvx.com/radar
+🤖 UNIACC WhatsApp Bot iniciado
+🌐 Servidor corriendo en puerto 3001
+📱 Webhook URL: http://localhost:3001/webhook
+💚 Health check: http://localhost:3001/health
+📊 Stats: http://localhost:3001/stats
+⚡ Ambiente: development
+[2025-08-27T15:36:21.024Z] GET / - IP: ::1
+[2025-08-27T15:36:23.202Z] GET /.well-known/appspecific/com.chrome.devtools.json - IP: ::1
+[2025-08-27T15:36:25.543Z] POST /test-chat - IP: ::1
+🧪 [DEMO] Mensaje de 56912345240: "hola"
+🤖 [56912345240] Procesando: "hola" | Estado: null/null
+📊 Interacción registrada para 56912345240
+[2025-08-27T15:36:30.606Z] POST /test-chat - IP: ::1
+🧪 [DEMO] Mensaje de 56912345240: "juan pablo"
+🤖 [56912345240] Procesando: "juan pablo" | Estado: captura_inicial/solicitar_nombre
+📊 Interacción registrada para 56912345240
+[2025-08-27T15:36:36.085Z] POST /test-chat - IP: ::1
+🧪 [DEMO] Mensaje de 56912345240: "jpsilvafe@jj.cl"
+🤖 [56912345240] Procesando: "jpsilvafe@jj.cl" | Estado: captura_inicial/solicitar_email
+📊 Interacción registrada para 56912345240
+[2025-08-27T15:36:42.702Z] POST /test-chat - IP: ::1
+🧪 [DEMO] Mensaje de 56912345240: "40"
+🤖 [56912345240] Procesando: "40" | Estado: captura_inicial/solicitar_edad
+📊 Interacción registrada para 56912345240
+[2025-08-27T15:36:45.957Z] POST /test-chat - IP: ::1
+🧪 [DEMO] Mensaje de 56912345240: "7"
+🤖 [56912345240] Procesando: "7" | Estado: captura_inicial/solicitar_region
+📊 Interacción registrada para 56912345240
+[2025-08-27T15:36:50.748Z] POST /test-chat - IP: ::1
+🧪 [DEMO] Mensaje de 56912345240: "964255300"
+🤖 [56912345240] Procesando: "964255300" | Estado: captura_inicial/solicitar_telefono
+💾 Guardando prospecto: juan pablo
+📋 Datos enviados: {
+  "nombre": "juan pablo",
+  "email": "jpsilvafe@jj.cl",
+  "telefono": "964255300",
+  "whatsapp": "56912345240",
+  "edad": 40,
+  "region": "Metropolitana",
+  "carrera_interes": "Sin especificar",
+  "facultad_interes": "Sin especificar",
+  "source": "whatsapp_bot",
+  "flujo_actual": "consulta_general"
+}
+📤 Enviando prospecto al dashboard: jpsilvafe@jj.cl
+🔧 DEBUG - Webhook URL: http://localhost:3002/api/botpress-webhook
+🔧 DEBUG - Payload enviado: {
+  "nombre": "juan pablo",
+  "email": "jpsilvafe@jj.cl",
+  "telefono": "964255300",
+  "whatsapp": "56912345240",
+  "edad": 40,
+  "region": "Metropolitana",
+  "carrera_interes": "Sin especificar",
+  "facultad_interes": "Sin especificar",
+  "source": "whatsapp_bot",
+  "flujo_actual": "consulta_general",
+  "timestamp": "2025-08-27T15:36:50.750Z",
+  "canal": "whatsapp_bot",
+  "estado": "nuevo"
+}
+🔧 DEBUG - Response status: 200
+🔧 DEBUG - Response data: {
+  "success": true,
+  "prospecto_id": "7261d2d0-997f-48f3-bb0f-9bc79703a54d",
+  "data": {
+    "id": "7261d2d0-997f-48f3-bb0f-9bc79703a54d",
+    "created_at": "2025-08-27T15:36:50.75+00:00",
+    "updated_at": "2025-08-27T15:36:51.742241+00:00",
+    "nombre": "juan pablo",
+    "email": "jpsilvafe@jj.cl",
+    "telefono": "964255300",
+    "whatsapp": "56912345240",
+    "edad": null,
+    "ocupacion": null,
+    "carrera_interes": "Sin especificar",
+    "nivel_educacion": null,
+    "experiencia_previa": null,
+    "region": null,
+    "ciudad": null,
+    "pais": "Chile",
+    "estado": "nuevo",
+    "nivel_interes": "alto",
+    "assigned_to": null,
+    "ejecutivo_asignado_at": null,
+    "fuente": "whatsapp_bot",
+    "metadata": {
+      "bot_source": "uniacc_direct",
+      "conversation_flow": "consulta_general"
+    },
+    "notas": null,
+    "tags": null,
+    "ultimo_contacto": null,
+    "proximo_seguimiento": null,
+    "facultad_interes": null,
+    "tipo_consulta": "consulta general"
+  }
+}
+✅ Prospecto guardado exitosamente
+✅ Prospecto guardado exitosamente: 7261d2d0-997f-48f3-bb0f-9bc79703a54d
+📊 Interacción registrada para 56912345240
+[2025-08-27T15:36:54.848Z] POST /test-chat - IP: ::1
+🧪 [DEMO] Mensaje de 56912345240: "5"
+🤖 [56912345240] Procesando: "5" | Estado: menu_principal/null
+✅ Usuario 56912345240 ya tiene datos completos, finalizando solicitud de asesor
+🔧 Opción guardada: hablar_asesor
+✅ Usuario 56912345240 ya tiene datos completos, finalizando solicitud de asesor
+📋 Guardando solicitud de asesor para: juan pablo
+🔧 Estado al guardar: {
+  "opcion_menu_seleccionada": "hablar_asesor",
+  "flujo_actual": "hablar_asesor"
+}
+📤 Enviando prospecto al dashboard: jpsilvafe@jj.cl
+🔧 DEBUG - Webhook URL: http://localhost:3002/api/botpress-webhook
+🔧 DEBUG - Payload enviado: {
+  "nombre": "juan pablo",
+  "email": "jpsilvafe@jj.cl",
+  "telefono": "964255300",
+  "whatsapp": "56912345240",
+  "edad": 40,
+  "region": "Metropolitana",
+  "carrera_interes": "",
+  "facultad_interes": "",
+  "source": "asesor_request",
+  "flujo_actual": "hablar_asesor",
+  "timestamp": "2025-08-27T15:36:54.850Z",
+  "canal": "whatsapp_bot",
+  "estado": "nuevo"
+}
+🔧 DEBUG - Response status: 200
+🔧 DEBUG - Response data: {
+  "success": true,
+  "prospecto_id": "9cc0803f-6f7f-4dfa-8621-041b9186953c",
+  "data": {
+    "id": "9cc0803f-6f7f-4dfa-8621-041b9186953c",
+    "created_at": "2025-08-27T15:36:54.85+00:00",
+    "updated_at": "2025-08-27T15:36:55.831955+00:00",
+    "nombre": "juan pablo",
+    "email": "jpsilvafe@jj.cl",
+    "telefono": "964255300",
+    "whatsapp": "56912345240",
+    "edad": null,
+    "ocupacion": null,
+    "carrera_interes": "",
+    "nivel_educacion": null,
+    "experiencia_previa": null,
+    "region": null,
+    "ciudad": null,
+    "pais": "Chile",
+    "estado": "nuevo",
+    "nivel_interes": "urgente",
+    "assigned_to": null,
+    "ejecutivo_asignado_at": null,
+    "fuente": "asesor_request",
+    "metadata": {
+      "bot_source": "uniacc_direct",
+      "conversation_flow": "hablar_asesor"
+    },
+    "notas": null,
+    "tags": null,
+    "ultimo_contacto": null,
+    "proximo_seguimiento": null,
+    "facultad_interes": null,
+    "tipo_consulta": "solicitud de asesor"
+  }
+}
+✅ Prospecto guardado exitosamente
+✅ Solicitud de asesor guardada exitosamente: 9cc0803f-6f7f-4dfa-8621-041b9186953c
+📊 Interacción registrada para 56912345240

@@ -11,6 +11,7 @@ export interface ProspectoData {
   facultad_interes?: string
   nivel_interes?: string
   source: string
+  flujo_actual?: string
   utm_source?: string
   utm_medium?: string
   utm_campaign?: string
@@ -33,6 +34,7 @@ export class SupabaseIntegration {
   }> {
     try {
       console.log('📤 Enviando prospecto al dashboard:', data.email)
+      console.log('🔧 DEBUG - Webhook URL:', this.webhookUrl)
 
       const payload = {
         ...data,
@@ -41,6 +43,8 @@ export class SupabaseIntegration {
         estado: 'nuevo'
       }
 
+      console.log('🔧 DEBUG - Payload enviado:', JSON.stringify(payload, null, 2))
+      
       const response = await axios.post(this.webhookUrl, payload, {
         headers: {
           'Content-Type': 'application/json',
@@ -49,6 +53,9 @@ export class SupabaseIntegration {
         },
         timeout: 15000
       })
+
+      console.log('🔧 DEBUG - Response status:', response.status)
+      console.log('🔧 DEBUG - Response data:', JSON.stringify(response.data, null, 2))
 
       if (response.status === 200 || response.status === 201) {
         console.log('✅ Prospecto guardado exitosamente')
@@ -112,7 +119,7 @@ export class SupabaseIntegration {
       }
 
       // Enviar a endpoint de interacciones (si existe)
-      const interaccionUrl = this.webhookUrl.replace('/api/prospectos', '/api/interacciones')
+      const interaccionUrl = this.webhookUrl.replace('/api/botpress-webhook', '/api/interacciones')
       
       await axios.post(interaccionUrl, payload, {
         headers: {

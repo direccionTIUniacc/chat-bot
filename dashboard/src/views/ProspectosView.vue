@@ -17,7 +17,7 @@
 
     <!-- Filtros y búsqueda -->
     <div class="card p-4">
-      <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
         <input
           v-model="searchTerm"
           type="text"
@@ -49,6 +49,20 @@
           <option value="web">Sitio Web</option>
           <option value="social">Redes Sociales</option>
           <option value="referido">Referido</option>
+        </select>
+        
+        <select
+          v-model="selectedTipoConsulta"
+          class="input-field"
+          @change="handleFilterChange"
+        >
+          <option value="">Todos los tipos</option>
+          <option value="solicitud de asesor" class="text-red-600 font-bold">🚨 URGENTE - Solicitud de Asesor</option>
+          <option value="consulta carrera">Consulta Carrera</option>
+          <option value="consulta proceso admision">Consulta Proceso Admisión</option>
+          <option value="consulta costos y/o becas">Consulta Costos y/o Becas</option>
+          <option value="consulta de modalidades de estudio">Consulta de Modalidades de Estudio</option>
+          <option value="consulta general">Consulta General</option>
         </select>
         
         <button
@@ -89,6 +103,9 @@
                 Prospecto
               </th>
               <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Consulta
+              </th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Carrera
               </th>
               <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -120,15 +137,24 @@
                 </div>
               </td>
               <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                {{ prospecto.carrera_interes }}
+                {{ formatTipoConsulta(prospecto.tipo_consulta) }}
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                {{ prospecto.carrera_interes || 'No especificada' }}
               </td>
               <td class="px-6 py-4 whitespace-nowrap">
-                <span :class="[
-                  'inline-flex px-2 py-1 text-xs font-medium rounded-full',
-                  getStatusColor(prospecto.estado)
-                ]">
-                  {{ formatStatus(prospecto.estado) }}
-                </span>
+                <div class="flex flex-col gap-1">
+                  <span :class="[
+                    'inline-flex px-2 py-1 text-xs font-medium rounded-full',
+                    getStatusColor(prospecto.estado)
+                  ]">
+                    {{ formatStatus(prospecto.estado) }}
+                  </span>
+                  <span v-if="prospecto.nivel_interes === 'urgente'" 
+                    class="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-red-100 text-red-800 animate-pulse">
+                    🚨 URGENTE
+                  </span>
+                </div>
               </td>
               <td class="px-6 py-4 whitespace-nowrap">
                 <span :class="[
@@ -139,7 +165,7 @@
                 </span>
               </td>
               <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                {{ formatDate(prospecto.created_at) }}
+                {{ formatDateTimeChile(prospecto.created_at) }}
               </td>
               <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                 <div class="flex justify-end space-x-2">
@@ -194,7 +220,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { Plus, Users, Eye, Edit, Trash2, FilterX } from 'lucide-vue-next'
 import { useProspectosStore } from '@/stores/prospectos'
-import { formatDate, formatStatus, formatSource } from '@/utils/formatters'
+import { formatDate, formatStatus, formatSource, formatTipoConsulta, formatDateTimeChile } from '@/utils/formatters'
 import { PROSPECTO_ESTADOS_COLORS, PROSPECTO_FUENTES_COLORS } from '@/utils/constants'
 import LoadingSpinner from '@/components/common/LoadingSpinner.vue'
 
@@ -205,6 +231,7 @@ const prospectosStore = useProspectosStore()
 const searchTerm = ref('')
 const selectedStatus = ref('')
 const selectedSource = ref('')
+const selectedTipoConsulta = ref('')
 
 // Computed
 const paginationPages = computed(() => {
@@ -230,7 +257,8 @@ const handleSearch = () => {
 const handleFilterChange = () => {
   prospectosStore.applyFilters({
     status: selectedStatus.value,
-    source: selectedSource.value
+    source: selectedSource.value,
+    tipo_consulta: selectedTipoConsulta.value
   })
 }
 
@@ -238,6 +266,7 @@ const clearFilters = () => {
   searchTerm.value = ''
   selectedStatus.value = ''
   selectedSource.value = ''
+  selectedTipoConsulta.value = ''
   prospectosStore.resetFilters()
 }
 

@@ -591,30 +591,9 @@ app.post('/test-chat', async (req: Request, res: Response) => {
     // Registro de interacción
     await supabaseIntegration.registrarInteraccion(phone, message, respuestaBbot)
 
-    // Verificar si se completó captura de datos
-    const prospectoData = uniaccBot.getProspectoData(phone)
+    // Los prospectos se envían al final de cada flujo, no automáticamente
     let prospectoGuardado = false
     let prospectoId = null
-
-    if (prospectoData.nombre && prospectoData.email && prospectoData.telefono) {
-      console.log('🧪 [DEMO] Prospecto completo detectado')
-      
-      const resultProspecto = await supabaseIntegration.enviarProspecto({
-        nombre: prospectoData.nombre,
-        email: prospectoData.email,
-        telefono: prospectoData.telefono,
-        whatsapp: phone,
-        carrera_interes: prospectoData.carrera_interes,
-        facultad_interes: prospectoData.facultad_interes,
-        edad: prospectoData.edad,
-        region: prospectoData.region,
-        nivel_interes: 'alto',
-        source: 'demo_chatbot'
-      })
-
-      prospectoGuardado = resultProspecto.success
-      prospectoId = resultProspecto.prospectoId
-    }
 
     return res.status(200).json({
       status: 'success',
@@ -626,7 +605,7 @@ app.post('/test-chat', async (req: Request, res: Response) => {
         timestamp: new Date().toISOString()
       },
       prospecto: {
-        data: prospectoData,
+        data: uniaccBot.getProspectoData(phone),
         guardado: prospectoGuardado,
         id: prospectoId
       }

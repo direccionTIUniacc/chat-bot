@@ -7,6 +7,32 @@ interface WebhookRequest extends IncomingMessage {
   body?: any
 }
 
+// Mapear flujo del chatbot al tipo de consulta para la DB
+function mapearFlujoATipoConsulta(flujoActual: string): string {
+  const mapeo: Record<string, string> = {
+    'conocer_carreras': 'consulta carrera',
+    'proceso_admision': 'consulta proceso admision', 
+    'costos_becas': 'consulta costos y/o becas',
+    'modalidades_estudio': 'consulta de modalidades de estudio',
+    'hablar_asesor': 'solicitud de asesor',
+    // Mapeos adicionales por si llegan otros flujos
+    'exploracion_carreras': 'consulta carrera',
+    'detalle_carrera': 'consulta carrera',
+    'captura_datos': 'solicitud de asesor',
+    'menu_principal': 'consulta general'
+  }
+  
+  return mapeo[flujoActual] || 'consulta general'
+}
+
+// Determinar nivel de interés basado en el tipo de consulta
+function determinarNivelInteres(tipoConsulta: string, nivelOriginal?: string): string {
+  if (tipoConsulta === 'solicitud de asesor') {
+    return 'urgente'
+  }
+  return nivelOriginal || 'alto'
+}
+
 // Verificar firma del webhook para seguridad
 function verifyWebhookSignature(
   payload: string, 
@@ -30,6 +56,8 @@ async function processLeadCaptured(eventData: any) {
     const { supabase } = useSupabase()
 
     console.log('📊 Procesando prospecto UNIACC:', eventData)
+    console.log('🔧 DEBUG - flujo_actual recibido:', eventData.flujo_actual)
+    console.log('🔧 DEBUG - tipo_consulta mapeado:', mapearFlujoATipoConsulta(eventData.flujo_actual))
 
     // Crear prospecto en Supabase con estructura UNIACC
     const { data, error } = await supabase
@@ -40,11 +68,12 @@ async function processLeadCaptured(eventData: any) {
         telefono: eventData.telefono,
         whatsapp: eventData.whatsapp,
         carrera_interes: eventData.carrera_interes,
-        nivel_interes: eventData.nivel_interes || 'alto',
+        nivel_interes: determinarNivelInteres(mapearFlujoATipoConsulta(eventData.flujo_actual), eventData.nivel_interes),
         fuente: eventData.source || 'uniacc_chatbot',
         estado: 'nuevo',
         campus_preferido: eventData.campus_preferido,
-        created_at: new Date(eventData.timestamp),
+        tipo_consulta: mapearFlujoATipoConsulta(eventData.flujo_actual),
+        created_at: new Date(eventData.timestamp || new Date().toLocaleString("en-US", {timeZone: "America/Santiago"})),
         metadata: {
           bot_source: 'uniacc_direct',
           conversation_flow: eventData.flujo_actual,

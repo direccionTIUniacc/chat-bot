@@ -1,0 +1,164 @@
+{
+    "project": {
+      "name": "UNIACC ChatBot - Sistema Completo de Captación de Prospectos",
+      "type": "microservices",
+      "repository": "https://github.com/direccionTIUniacc/chat-bot",
+      "version": "1.0.0",
+      "status": "MVP Completado",
+      "stack": [
+        "Node.js",
+        "TypeScript", 
+        "Vue.js 3",
+        "Express.js",
+        "Supabase PostgreSQL",
+        "WhatsApp Business API"
+      ],
+      "description": "Sistema de chatbot conversacional para UNIACC con captura automática de prospectos y dashboard de gestión en tiempo real"
+    },
+    "architecture": {
+      "pattern": "microservices",
+      "services": [
+        {
+          "name": "ChatBot Backend",
+          "port": 3001,
+          "tech": "Node.js + TypeScript + Express",
+          "purpose": "Bot de WhatsApp y lógica conversacional",
+          "endpoints": ["/webhook", "/test-chat", "/chat", "/health", "/stats"]
+        },
+        {
+          "name": "Dashboard Frontend", 
+          "port": 3000,
+          "tech": "Vue.js 3 + Vite + TypeScript",
+          "purpose": "Interfaz web administrativa",
+          "features": ["Gestión prospectos", "Chat en tiempo real", "Métricas"]
+        },
+        {
+          "name": "Dashboard API Server",
+          "port": 3002,
+          "tech": "Node.js + Express",
+          "purpose": "API REST para el dashboard",
+          "endpoints": ["/api/prospectos", "/api/conversaciones", "/api/stats"]
+        }
+      ],
+      "database": {
+        "provider": "Supabase",
+        "type": "PostgreSQL",
+        "url": "https://vtwdmyezyvhprwonengu.supabase.co",
+        "tables": ["prospectos", "conversaciones", "mensajes"],
+        "rpc_functions": ["upsert_prospecto_por_whatsapp"]
+      }
+    },
+    "currentSprint": {
+      "phase": "MVP Completado - Agosto 2025",
+      "completedFeatures": [
+        "✅ Chatbot completo con 5 flujos conversacionales",
+        "✅ Dashboard funcional con gestión de prospectos",
+        "✅ Integración Supabase con persistencia de datos", 
+        "✅ API REST completa para comunicación entre servicios",
+        "✅ Sistema de captura de prospectos con validaciones",
+        "✅ Interfaz web de testing completamente funcional",
+        "✅ Gestión de estado avanzada por usuario",
+        "✅ Función RPC personalizada para evitar duplicados"
+      ],
+      "nextPhase": [
+        "🔄 Integración real con WhatsApp Business API",
+        "🔄 Notificaciones en tiempo real (WebSockets)", 
+        "🔄 Deploy en producción (AWS/GCP)",
+        "🔄 Tests automatizados (Jest/Cypress)",
+        "🔄 Métricas avanzadas y analytics"
+      ],
+      "blockers": [],
+      "inProgress": []
+    },
+    "businessLogic": {
+      "chatbotFlows": [
+        "1️⃣ Conocer nuestras carreras (por facultad)",
+        "2️⃣ Proceso de admisión 2025",
+        "3️⃣ Costos y becas", 
+        "4️⃣ Modalidades de estudio",
+        "5️⃣ Hablar con un asesor"
+      ],
+      "facultades": [
+        "A) Artes: Teatro, Danza, Música, Artes Visuales",
+        "B) Comunicaciones: Audiovisual, Periodismo, Publicidad", 
+        "C) Arquitectura y Diseño: Arquitectura, Diseño de Interiores",
+        "D) Ciencias Jurídicas: Derecho, Psicología",
+        "E) Negocios y Tecnología: Ing. Comercial, Contador Auditor"
+      ],
+      "prospectoCaptureFlow": [
+        "1. Saludo inicial → Solicita nombre",
+        "2. Solicita email (con validación)",
+        "3. Solicita edad y región", 
+        "4. Solicita teléfono",
+        "5. Guarda en Supabase → Menú principal"
+      ]
+    },
+    "conventions": {
+      "codeStyle": {
+        "backend": "TypeScript con tipado fuerte",
+        "frontend": "Vue 3 Composition API + TypeScript",
+        "naming": "camelCase para variables, PascalCase para componentes",
+        "database": "snake_case para tablas y campos"
+      },
+      "fileStructure": {
+        "chatbot": "src/{actions,data,utils}/",
+        "dashboard": "src/{components,composables,views,types}/",
+        "components": "Organizados por funcionalidad (chat/, prospectos/, layout/)"
+      },
+      "apiConventions": {
+        "endpoints": "REST con prefijo /api/",
+        "responses": "JSON estructurado con error handling",
+        "validation": "Sanitización en todas las entradas"
+      }
+    },
+    "environment": {
+      "development": {
+        "ports": {
+          "chatbot": 3001,
+          "dashboard": 3000, 
+          "api": 3002
+        },
+        "urls": {
+          "chatbot": "http://localhost:3001",
+          "chat_demo": "http://localhost:3001/chat",
+          "dashboard": "http://localhost:3000",
+          "api": "http://localhost:3002"
+        }
+      },
+      "requiredEnvVars": {
+        "chatbot": [
+          "SUPABASE_URL",
+          "SUPABASE_ANON_KEY", 
+          "VUE_WEBHOOK_URL",
+          "WHATSAPP_ACCESS_TOKEN",
+          "WHATSAPP_VERIFY_TOKEN"
+        ],
+        "dashboard": [
+          "VITE_SUPABASE_URL",
+          "VITE_SUPABASE_ANON_KEY"
+        ]
+      }
+    },
+    "testing": {
+      "chatDemo": "http://localhost:3001/chat - Interfaz completa de testing",
+      "apiEndpoints": "Todos los endpoints tienen health checks",
+      "dataValidation": "Validación de email, teléfono, campos requeridos"
+    },
+    "deployment": {
+      "current": "Desarrollo local",
+      "target": "Producción (AWS/GCP)",
+      "requirements": [
+        "WhatsApp Business API tokens reales",
+        "SSL certificates", 
+        "Environment variables de producción",
+        "CI/CD pipeline"
+      ]
+    },
+    "documentation": {
+      "README": "Completo con guía de inicio rápido",
+      "arquitectura": "Documentación técnica detallada",
+      "schemas": "Esquema completo de Supabase con RPC functions"
+    },
+    "lastUpdated": "2025-08-26",
+    "maintainer": "Juan Pablo Silva"
+  }

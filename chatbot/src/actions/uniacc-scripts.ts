@@ -5,6 +5,7 @@ import { SupabaseIntegration, ProspectoData } from './supabase-integration'
 export interface UsuarioState {
   flujo_actual: string | null
   paso_actual: string | null
+  opcion_menu_seleccionada?: string
   datos_prospecto: {
     nombre?: string
     email?: string
@@ -193,33 +194,6 @@ Escribe el **número** de tu región:`
         
         const datos = state.datos_prospecto
         
-        // Guardar el prospecto en Supabase
-        try {
-          const prospectoData: ProspectoData = {
-            nombre: datos.nombre!,
-            email: datos.email!,
-            telefono: mensaje,
-            whatsapp: userId, // El userId es el número de WhatsApp
-            edad: datos.edad,
-            region: datos.region,
-            carrera_interes: state.carrera_seleccionada || datos.carrera_interes || 'Sin especificar',
-            facultad_interes: state.facultad_seleccionada || 'Sin especificar',
-            source: 'whatsapp_bot'
-          }
-
-          console.log('💾 Guardando prospecto:', prospectoData.nombre)
-          console.log('📋 Datos enviados:', JSON.stringify(prospectoData, null, 2))
-          const resultado = await this.supabaseIntegration.enviarProspecto(prospectoData)
-          
-          if (resultado.success) {
-            console.log('✅ Prospecto guardado exitosamente:', resultado.prospectoId)
-          } else {
-            console.error('❌ Error guardando prospecto:', resultado.error)
-          }
-        } catch (error) {
-          console.error('💥 Error al procesar prospecto:', error)
-        }
-        
         this.setUsuarioState(userId, {
           datos_prospecto: { ...datos, telefono: mensaje },
           flujo_actual: 'menu_principal',
@@ -259,7 +233,8 @@ Escribe el número de tu opción 📝`
     if (mensaje.includes('1') || mensaje.includes('carrera')) {
       this.setUsuarioState(userId, {
         flujo_actual: 'exploracion_carreras',
-        paso_actual: 'seleccion_facultad'
+        paso_actual: 'seleccion_facultad',
+        opcion_menu_seleccionada: 'conocer_carreras'
       })
       return RESPUESTAS.menu_facultades
     }
@@ -267,17 +242,24 @@ Escribe el número de tu opción 📝`
     if (mensaje.includes('2') || mensaje.includes('admision') || mensaje.includes('proceso')) {
       this.setUsuarioState(userId, {
         flujo_actual: 'proceso_admision',
-        paso_actual: 'info_general'
+        paso_actual: 'info_general',
+        opcion_menu_seleccionada: 'proceso_admision'
       })
       return RESPUESTAS.proceso_admision
     }
 
     if (mensaje.includes('3') || mensaje.includes('costo') || mensaje.includes('beca')) {
-      return this.mostrarCostosYBecas(userId)
+      this.setUsuarioState(userId, {
+        opcion_menu_seleccionada: 'costos_becas'
+      })
+      return await this.mostrarCostosYBecas(userId)
     }
 
     if (mensaje.includes('4') || mensaje.includes('modalidad')) {
-      return this.mostrarModalidades(userId)
+      this.setUsuarioState(userId, {
+        opcion_menu_seleccionada: 'modalidades_estudio'
+      })
+      return await this.mostrarModalidades(userId)
     }
 
     if (mensaje.includes('5') || mensaje.includes('asesor') || mensaje.includes('humano')) {
@@ -285,8 +267,14 @@ Escribe el número de tu opción 📝`
       const state = this.getUsuarioState(userId)
       const datos = state.datos_prospecto
       
+      // IMPORTANTE: Guardar la opción seleccionada ANTES de cualquier otra lógica
+      this.setUsuarioState(userId, {
+        opcion_menu_seleccionada: 'hablar_asesor'
+      })
+      
       if (datos.nombre && datos.email && datos.telefono) {
         console.log('✅ Usuario', userId, 'ya tiene datos completos, finalizando solicitud de asesor')
+        console.log('🔧 Opción guardada:', this.getUsuarioState(userId).opcion_menu_seleccionada)
         return await this.iniciarCapturaDatos(userId)
       } else {
         // Solo cambiar el flujo si no tiene datos completos
@@ -513,11 +501,11 @@ ${this.mostrarMenuNavegacion()}`
     }
 
     if (mensaje.includes('3') || mensaje.includes('costo') || mensaje.includes('beca')) {
-      return this.mostrarCostosYBecas(userId)
+      return await this.mostrarCostosYBecas(userId)
     }
 
     if (mensaje.includes('4') || mensaje.includes('modalidad')) {
-      return this.mostrarModalidades(userId)
+      return await this.mostrarModalidades(userId)
     }
 
     if (mensaje.includes('5') || mensaje.includes('asesor') || mensaje.includes('humano')) {
@@ -578,7 +566,7 @@ ${this.mostrarMenuNavegacion()}`
     return mensaje
   }
 
-  private mostrarCostosYBecas(userId: string): string {
+  private async mostrarCostosYBecas(userId: string): Promise<string> {
     let mensaje = `💰 **COSTOS Y BECAS UNIACC 2025**\n\n`
     
     mensaje += `💵 **COSTOS PROMEDIO:**\n`
@@ -596,17 +584,21 @@ ${this.mostrarMenuNavegacion()}`
 
     mensaje += `¿Quieres saber sobre becas para una carrera específica?\n\n`
     
-    mensaje += this.mostrarMenuNavegacion()
+    mensaje += `✨ **¡Gracias por tu consulta!**\n\n`
+    mensaje += `💬 **Escribe "Hola" para comenzar con una nueva consulta**`
     
     this.setUsuarioState(userId, {
       flujo_actual: 'menu_principal',
       paso_actual: 'post_becas'
     })
 
+    // Guardar prospecto al finalizar consulta de becas
+    await this.guardarProspectoFinalFlujo(userId, 'costos_becas')
+
     return mensaje
   }
 
-  private mostrarModalidades(userId: string): string {
+  private async mostrarModalidades(userId: string): Promise<string> {
     let mensaje = `🏫 **MODALIDADES DE ESTUDIO UNIACC**\n\n`
     
     mensaje += `📍 **PRESENCIAL**\n`
@@ -625,12 +617,16 @@ ${this.mostrarMenuNavegacion()}`
 
     mensaje += `¿Qué modalidad te conviene más?\n\n`
 
-    mensaje += this.mostrarMenuNavegacion()
+    mensaje += `✨ **¡Gracias por tu consulta!**\n\n`
+    mensaje += `💬 **Escribe "Hola" para comenzar con una nueva consulta**`
 
     this.setUsuarioState(userId, {
       flujo_actual: 'menu_principal',
       paso_actual: 'post_modalidades'
     })
+
+    // Guardar prospecto al finalizar consulta de modalidades
+    await this.guardarProspectoFinalFlujo(userId, 'modalidades_estudio')
 
     return mensaje
   }
@@ -676,14 +672,23 @@ ${this.mostrarMenuNavegacion()}`
           region: datos.region,
           carrera_interes: carreraInfo,
           facultad_interes: facultadInfo,
-          source: 'asesor_request'
+          source: 'asesor_request',
+          flujo_actual: state.opcion_menu_seleccionada || 'hablar_asesor'
         }
 
         console.log('📋 Guardando solicitud de asesor para:', datos.nombre)
+        console.log('🔧 Estado al guardar:', JSON.stringify({
+          opcion_menu_seleccionada: state.opcion_menu_seleccionada,
+          flujo_actual: prospectoData.flujo_actual
+        }, null, 2))
         const resultado = await this.supabaseIntegration.enviarProspecto(prospectoData)
         
         if (resultado.success) {
           console.log('✅ Solicitud de asesor guardada exitosamente:', resultado.prospectoId)
+          
+          // Resetear usuario después de guardar exitosamente para permitir nueva consulta
+          this.resetUsuario(userId)
+          console.log(`🔄 Usuario ${userId} reseteado para nueva consulta`)
         }
       } catch (error) {
         console.error('💥 Error guardando solicitud de asesor:', error)
@@ -713,7 +718,9 @@ ${facultadInfo && !carreraInfo ? `• **${facultadInfo}** - Carreras disponibles
 
 **¡Gracias por tu interés en UNIACC!** 🎓✨
 
-*Universidad de Artes, Ciencias y Comunicaciones*`
+*Universidad de Artes, Ciencias y Comunicaciones*
+
+💬 **Escribe "Hola" para comenzar con una nueva consulta**`
     }
 
     // Si no tenemos datos completos, iniciar captura normal
@@ -875,7 +882,51 @@ Escribe el número de tu opción 📝`
       timestamp: new Date().toISOString(),
       carrera_interes: state.carrera_seleccionada || state.datos_prospecto.carrera_interes,
       facultad_interes: state.facultad_seleccionada,
+      flujo_actual: state.opcion_menu_seleccionada || 'consulta_general',
       ...state.datos_prospecto
     }
   }
+
+  // Método para guardar prospecto al final de cada flujo
+  private async guardarProspectoFinalFlujo(userId: string, tipoConsulta: string) {
+    const state = this.getUsuarioState(userId)
+    const datos = state.datos_prospecto
+    
+    // Solo guardar si tenemos los datos mínimos
+    if (!datos.nombre || !datos.email || !datos.telefono) {
+      console.log('⚠️ No se puede guardar prospecto, faltan datos básicos')
+      return
+    }
+
+    try {
+      const prospectoData: ProspectoData = {
+        nombre: datos.nombre,
+        email: datos.email,
+        telefono: datos.telefono,
+        whatsapp: userId,
+        edad: datos.edad,
+        region: datos.region,
+        carrera_interes: state.carrera_seleccionada || datos.carrera_interes || 'Sin especificar',
+        facultad_interes: state.facultad_seleccionada || 'Sin especificar',
+        source: 'uniacc_chatbot',
+        flujo_actual: tipoConsulta
+      }
+
+      console.log(`💾 Guardando prospecto al finalizar flujo ${tipoConsulta}:`, datos.nombre)
+      const resultado = await this.supabaseIntegration.enviarProspecto(prospectoData)
+      
+      if (resultado.success) {
+        console.log(`✅ Prospecto guardado exitosamente para flujo ${tipoConsulta}:`, resultado.prospectoId)
+        
+        // Resetear usuario después de guardar exitosamente para permitir nueva consulta
+        this.resetUsuario(userId)
+        console.log(`🔄 Usuario ${userId} reseteado para nueva consulta`)
+      } else {
+        console.error(`❌ Error guardando prospecto para flujo ${tipoConsulta}:`, resultado.error)
+      }
+    } catch (error) {
+      console.error(`💥 Error al guardar prospecto para flujo ${tipoConsulta}:`, error)
+    }
+  }
+
 }

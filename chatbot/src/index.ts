@@ -519,6 +519,110 @@ app.get('/', (req: Request, res: Response) => {
 
         // Auto-focus
         messageInput.focus();
+
+        // ⏰ SISTEMA DE TIMEOUT PARA DEMO
+        let timeoutCheckInterval;
+        let currentUserId = null;
+
+        // Función para verificar mensajes de timeout
+        async function checkForTimeoutMessages() {
+            if (!currentUserId) return;
+            
+            try {
+                const response = await fetch(\`/check-timeout/\${currentUserId}\`);
+                const data = await response.json();
+                
+                if (data.success && data.hasTimeout && data.message) {
+                    // Mostrar mensaje de timeout como respuesta del bot
+                    addResult('⏰ Sistema de Timeout', { 
+                        conversation: {
+                            user_message: '(Sistema automático)',
+                            bot_response: data.message
+                        }
+                    }, 'chat');
+                    
+                    // Si es un warning, no detener el checking
+                    // Si es timeout final, limpiar el checking
+                    if (data.type === 'timeout') {
+                        clearInterval(timeoutCheckInterval);
+                        currentUserId = null;
+                    }
+                }
+            } catch (error) {
+                console.error('Error verificando timeout:', error);
+            }
+        }
+
+        // Función para iniciar el sistema de timeout cuando se inicia una conversación
+        function startTimeoutChecking(userId) {
+            currentUserId = userId;
+            
+            // Verificar cada 5 segundos si hay mensajes de timeout
+            timeoutCheckInterval = setInterval(checkForTimeoutMessages, 5000);
+            
+            console.log(\`⏰ Sistema de timeout iniciado para usuario: \${userId}\`);
+        }
+
+        // Función para detener el sistema de timeout
+        function stopTimeoutChecking() {
+            if (timeoutCheckInterval) {
+                clearInterval(timeoutCheckInterval);
+                timeoutCheckInterval = null;
+            }
+            currentUserId = null;
+            console.log('⏰ Sistema de timeout detenido');
+        }
+
+        // Event listener para interceptar envío de mensajes
+        messageInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                const message = messageInput.value.toLowerCase().trim();
+                
+                // Si es el primer mensaje (hola), iniciar timeout checking después de un pequeño delay
+                if (message === 'hola' || message === 'hi') {
+                    setTimeout(() => {
+                        startTimeoutChecking(currentPhone);
+                    }, 1000); // 1 segundo para que el mensaje se procese
+                }
+            }
+        });
+
+        // Botón para forzar timeout (solo para testing)
+        const forceTimeoutBtn = document.createElement('button');
+        forceTimeoutBtn.textContent = '🧪 Forzar Timeout (Testing)';
+        forceTimeoutBtn.className = 'mt-2 px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600';
+        forceTimeoutBtn.onclick = async () => {
+            if (!currentUserId) {
+                alert('Inicia una conversación primero');
+                return;
+            }
+            
+            try {
+                const response = await fetch(\`/force-timeout/\${currentUserId}\`, {
+                    method: 'POST'
+                });
+                const data = await response.json();
+                
+                if (data.success && data.message) {
+                    addResult('⏰ Timeout Forzado', { 
+                        conversation: {
+                            user_message: '(Timeout automático)',
+                            bot_response: data.message
+                        }
+                    }, 'chat');
+                    
+                    stopTimeoutChecking();
+                }
+            } catch (error) {
+                console.error('Error forzando timeout:', error);
+            }
+        };
+        
+        // Agregar botón debajo del input (con validación)
+        const inputContainer = document.querySelector('.border.rounded.p-4') || document.body;
+        inputContainer.appendChild(forceTimeoutBtn);
+        
+        console.log('🧪 Sistema de timeout demo inicializado');
     </script>
 </body>
 </html>
@@ -755,6 +859,54 @@ app.use((error: any, req: Request, res: Response, next: NextFunction) => {
     error: 'Internal server error',
     timestamp: new Date().toISOString()
   })
+})
+
+// **ENDPOINT: Verificar mensajes de timeout para interfaz demo**
+app.get('/check-timeout/:userId', async (req: Request, res: Response) => {
+  try {
+    const { userId } = req.params
+    
+    // Verificar si hay warning pendiente
+    const warningMessage = await uniaccBot.checkForTimeoutWarning(userId)
+    
+    res.json({
+      success: true,
+      hasTimeout: !!warningMessage,
+      message: warningMessage,
+      type: warningMessage ? 'warning' : null,
+      timestamp: new Date().toISOString()
+    })
+    
+  } catch (error) {
+    console.error('❌ Error verificando timeout:', error)
+    res.status(500).json({
+      success: false,
+      error: 'Error verificando timeout'
+    })
+  }
+})
+
+// **ENDPOINT: Forzar timeout para testing**
+app.post('/force-timeout/:userId', async (req: Request, res: Response) => {
+  try {
+    const { userId } = req.params
+    
+    const timeoutMessage = await uniaccBot.forceTimeout(userId)
+    
+    res.json({
+      success: true,
+      message: timeoutMessage,
+      type: 'timeout',
+      timestamp: new Date().toISOString()
+    })
+    
+  } catch (error) {
+    console.error('❌ Error forzando timeout:', error)
+    res.status(500).json({
+      success: false,
+      error: 'Error forzando timeout'
+    })
+  }
 })
 
 // Endpoints para el dashboard (con Supabase + fallback)

@@ -88,6 +88,7 @@ export interface ProspectoSupabase {
   telefono?: string
   whatsapp: string
   carrera_interes?: string
+  tipo_consulta?: string
   estado?: 'nuevo' | 'contactado' | 'interesado' | 'matriculado' | 'descartado'
   fuente?: 'whatsapp_bot' | 'web_form' | 'facebook_ads' | 'google_ads' | 'referido'
   nivel_interes?: 'bajo' | 'medio' | 'alto' | 'muy_alto'
@@ -146,9 +147,10 @@ export async function guardarProspecto(datos: any): Promise<{
       telefono: datos.telefono || undefined,
       whatsapp: numeroFormateado, // Usar el número ya formateado
       carrera_interes: datos.carrera_interes || undefined,
+      tipo_consulta: datos.tipo_consulta || undefined,
       estado: 'nuevo',
       fuente: 'whatsapp_bot',
-      nivel_interes: 'medio',
+      nivel_interes: datos.nivel_interes || 'medio',
       pais: 'Chile',
       region: datos.region || undefined,
       ciudad: datos.ciudad || undefined,

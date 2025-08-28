@@ -15,6 +15,15 @@ export const ProspectoSchema = z.object({
   programa_interes: z.string().optional(), // ID del programa específico
   facultad: z.string().optional(), // Facultad de interés
   nivel_interes: z.enum(['bajo', 'medio', 'alto']).optional(),
+  tipo_consulta: z.enum([
+    'consulta_general',
+    'consulta carrera', 
+    'consulta proceso admision',
+    'consulta costos y/o becas',
+    'consulta de modalidades de estudio',
+    'solicitud de asesor',
+    'ingreso solo datos basicos'
+  ]).optional(),
   
   // Gestión del prospecto
   fuente: z.enum(['whatsapp_bot', 'web_form', 'facebook_ads', 'google_ads', 'referido', 'social']),

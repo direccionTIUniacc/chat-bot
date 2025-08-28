@@ -10,6 +10,7 @@ export interface ProspectoData {
   carrera_interes?: string
   facultad_interes?: string
   nivel_interes?: string
+  tipo_consulta?: string
   source: string
   flujo_actual?: string
   utm_source?: string

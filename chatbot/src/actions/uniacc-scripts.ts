@@ -24,11 +24,19 @@ export interface UsuarioState {
   es_usuario_recurrente?: boolean
   fecha_ultima_interaccion?: Date
   intentos_captura: number
+  // Nuevos campos para timeout
+  timeout_warning_sent?: boolean
+  session_timeout_id?: NodeJS.Timeout
+  warning_timeout_id?: NodeJS.Timeout
 }
 
 export class UniaccBot {
   private usuarios: Map<string, UsuarioState> = new Map()
   private supabaseIntegration: SupabaseIntegration
+  
+  // Constantes de timeout
+  private readonly SESSION_TIMEOUT = 120000 // 2 minutos
+  private readonly WARNING_TIMEOUT = 90000  // 1.5 minutos
 
   constructor(webhookUrl: string, webhookSecret: string) {
     this.supabaseIntegration = new SupabaseIntegration(webhookUrl, webhookSecret)
@@ -52,6 +60,9 @@ export class UniaccBot {
   }
 
   private resetUsuario(userId: string) {
+    // Limpiar timeouts antes de resetear
+    this.clearTimeouts(userId)
+    
     this.usuarios.set(userId, {
       flujo_actual: null,
       paso_actual: null,
@@ -66,6 +77,9 @@ export class UniaccBot {
     const textoLimpio = mensaje.toLowerCase().trim()
 
     console.log(`🤖 [${userId}] Procesando: "${mensaje}" | Estado: ${state.flujo_actual}/${state.paso_actual}`)
+
+    // Configurar timeout para esta sesión
+    this.setSessionTimeout(userId)
 
     // Si es saludo o inicio, reiniciar
     if (this.esSaludo(textoLimpio) || !state.flujo_actual) {
@@ -1406,6 +1420,222 @@ Escribe el número de tu opción 📝`
     } catch (error) {
       console.error(`💥 Error al guardar prospecto para flujo ${tipoConsulta}:`, error)
     }
+  }
+
+  // ⏰ MÉTODOS DE TIMEOUT DE SESIÓN
+
+  // Configurar timeout para cada mensaje
+  private setSessionTimeout(userId: string): void {
+    this.clearTimeouts(userId)
+    
+    const state = this.getUsuarioState(userId)
+    state.fecha_ultima_interaccion = new Date()
+    state.timeout_warning_sent = false
+    
+    // Warning a los 1.5 minutos
+    const warningTimeout = setTimeout(async () => {
+      await this.sendWarningMessage(userId)
+    }, this.WARNING_TIMEOUT)
+    
+    // Timeout final a los 2 minutos
+    const sessionTimeout = setTimeout(async () => {
+      await this.handleSessionTimeout(userId)
+    }, this.SESSION_TIMEOUT)
+    
+    // Guardar referencias para poder cancelarlos
+    state.warning_timeout_id = warningTimeout
+    state.session_timeout_id = sessionTimeout
+  }
+  
+  // Limpiar timeouts existentes
+  private clearTimeouts(userId: string): void {
+    const state = this.usuarios.get(userId)
+    if (state) {
+      if (state.warning_timeout_id) {
+        clearTimeout(state.warning_timeout_id)
+        state.warning_timeout_id = undefined
+      }
+      if (state.session_timeout_id) {
+        clearTimeout(state.session_timeout_id)
+        state.session_timeout_id = undefined
+      }
+    }
+  }
+  
+  // Enviar mensaje de advertencia personalizado
+  private async sendWarningMessage(userId: string): Promise<string | null> {
+    const state = this.getUsuarioState(userId)
+    
+    if (state.timeout_warning_sent) return null // Ya enviado
+    
+    state.timeout_warning_sent = true
+    const warningMessage = this.generateWarningMessage(state)
+    
+    console.log(`⏰ Warning generado para ${userId}: ${warningMessage}`)
+    
+    // TODO: Implementar envío por WhatsApp para producción
+    // try {
+    //   const { WhatsAppSender } = await import('../utils/whatsapp-sender')
+    //   const sender = new WhatsAppSender(
+    //     process.env.WHATSAPP_ACCESS_TOKEN!,
+    //     process.env.WHATSAPP_PHONE_NUMBER_ID!
+    //   )
+    //   
+    //   await sender.enviarMensaje(userId, warningMessage)
+    //   console.log(`⏰ Warning enviado por WhatsApp a ${userId}`)
+    //   
+    // } catch (error) {
+    //   console.error(`❌ Error enviando warning por WhatsApp a ${userId}:`, error)
+    // }
+    
+    // Para modo demo: retornar el mensaje para mostrar en interfaz
+    return warningMessage
+  }
+  
+  // Manejar timeout de sesión
+  private async handleSessionTimeout(userId: string): Promise<string> {
+    const state = this.getUsuarioState(userId)
+    
+    console.log(`⏰ Sesión timeout para ${userId}, evaluando datos...`)
+    
+    // Decidir si guardar datos
+    const shouldSave = this.shouldSaveTimeoutData(state)
+    let dataSaved = false
+    
+    if (shouldSave) {
+      try {
+        await this.saveTimeoutSessionData(userId, state)
+        dataSaved = true
+        console.log(`💾 Datos parciales guardados para ${userId}`)
+      } catch (error) {
+        console.error(`❌ Error guardando datos parciales:`, error)
+      }
+    }
+    
+    // Generar mensaje de timeout personalizado
+    const timeoutMessage = this.generateTimeoutMessage(state, dataSaved)
+    
+    console.log(`⏰ Timeout message generado para ${userId}: ${timeoutMessage}`)
+    
+    // TODO: Implementar envío por WhatsApp para producción
+    // try {
+    //   const { WhatsAppSender } = await import('../utils/whatsapp-sender')
+    //   const sender = new WhatsAppSender(
+    //     process.env.WHATSAPP_ACCESS_TOKEN!,
+    //     process.env.WHATSAPP_PHONE_NUMBER_ID!
+    //   )
+    //   
+    //   await sender.enviarMensaje(userId, timeoutMessage)
+    //   console.log(`⏰ Timeout message enviado por WhatsApp a ${userId}`)
+    //   
+    // } catch (error) {
+    //   console.error(`❌ Error enviando timeout message por WhatsApp:`, error)
+    // }
+    
+    // Limpiar sesión
+    this.clearTimeouts(userId)
+    this.resetUsuario(userId)
+    
+    console.log(`🧹 Sesión limpiada para ${userId}`)
+    
+    // Para modo demo: retornar el mensaje para mostrar en interfaz
+    return timeoutMessage
+  }
+
+  // Generar mensaje de warning personalizado
+  private generateWarningMessage(state: UsuarioState): string {
+    const nombre = state.datos_prospecto.nombre
+    
+    if (nombre && nombre.trim().length > 0) {
+      return `⏰ ${nombre}, tu sesión caducará en 30 segundos por inactividad.`
+    } else {
+      return `⏰ Tu sesión caducará en 30 segundos por inactividad.`
+    }
+  }
+
+  // Generar mensaje de timeout personalizado
+  private generateTimeoutMessage(state: UsuarioState, dataSaved: boolean): string {
+    const nombre = state.datos_prospecto.nombre
+    
+    if (dataSaved) {
+      return `⏰ ${nombre ? `${nombre}, tu` : 'Tu'} sesión ha finalizado por inactividad.
+
+📋 **Hemos guardado tus datos** para futuras consultas.
+
+Un asesor podrá contactarte cuando lo necesites.
+
+💬 **Escribe "Hola" para continuar explorando UNIACC**`
+    } else {
+      const nombreDisplay = nombre ? ` ${nombre}` : ''
+      return `⏰ Sesión finalizada por inactividad.${nombreDisplay ? ` ¡Hasta pronto${nombreDisplay}!` : ''}
+
+💬 **Escribe "Hola" para comenzar una nueva consulta**`
+    }
+  }
+
+  // Evaluar si guardar datos por timeout (criterio simplificado)
+  private shouldSaveTimeoutData(state: UsuarioState): boolean {
+    const datos = state.datos_prospecto
+    
+    // ✅ GUARDAR si tiene datos básicos (nombre, email, teléfono)
+    return !!(datos.nombre && datos.email && datos.telefono)
+  }
+
+  // Guardar datos por timeout
+  private async saveTimeoutSessionData(userId: string, state: UsuarioState): Promise<void> {
+    const datos = state.datos_prospecto
+    
+    const prospectoData: ProspectoData = {
+      nombre: datos.nombre!,
+      email: datos.email!,
+      telefono: datos.telefono!,
+      whatsapp: userId,
+      edad: datos.edad,
+      region: datos.region,
+      carrera_interes: datos.carrera_interes || "Sin especificar",
+      facultad_interes: "", // Vacío porque no llegó a explorar
+      nivel_interes: 'bajo', // Clave: marcamos como bajo interés
+      tipo_consulta: 'ingreso solo datos basicos', // Nuevo campo
+      source: 'timeout_session',
+      flujo_actual: state.flujo_actual || 'incompleto'
+    }
+    
+    console.log(`💾 Guardando prospecto por timeout: ${datos.nombre}`)
+    const resultado = await this.supabaseIntegration.enviarProspecto(prospectoData)
+    
+    if (resultado.success) {
+      console.log(`✅ Prospecto timeout guardado: ${resultado.prospectoId}`)
+    } else {
+      console.error(`❌ Error guardando prospecto timeout: ${resultado.error}`)
+    }
+  }
+
+  // ⏰ MÉTODOS PÚBLICOS PARA INTERFAZ DEMO
+
+  // Verificar si hay pending timeout warning para mostrar en interfaz
+  async checkForTimeoutWarning(userId: string): Promise<string | null> {
+    const state = this.getUsuarioState(userId)
+    
+    // Si hay warning pendiente y no se ha enviado, enviarlo
+    if (state.warning_timeout_id && !state.timeout_warning_sent) {
+      return await this.sendWarningMessage(userId)
+    }
+    
+    return null
+  }
+
+  // Verificar si hay pending timeout final para mostrar en interfaz
+  async checkForSessionTimeout(userId: string): Promise<string | null> {
+    const state = this.getUsuarioState(userId)
+    
+    // Solo para verificación manual desde interfaz
+    // Los timeouts reales se manejan automáticamente
+    return null
+  }
+
+  // Método para forzar timeout desde interfaz (para testing)
+  async forceTimeout(userId: string): Promise<string> {
+    return await this.handleSessionTimeout(userId)
   }
 
 }

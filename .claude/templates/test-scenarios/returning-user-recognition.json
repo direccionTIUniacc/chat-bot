@@ -1,0 +1,199 @@
+{
+  "name": "Usuario Recurrente - Reconocimiento Automático",
+  "description": "Test del sistema de reconocimiento de usuarios que regresan (30 días)",
+  "version": "1.0", 
+  "author": "UNIACC Testing System",
+  "tags": ["returning-user", "recognition", "rpc-functions", "user-experience"],
+  
+  "scenario": {
+    "user_id": "test_user_returning_003",
+    "whatsapp": "56912345003",
+    "expected_duration": "1-2 minutes",
+    "priority": "high",
+    
+    "prerequisite": {
+      "action": "create_existing_prospecto",
+      "description": "Crear prospecto existente simulando consulta previa",
+      "data": {
+        "whatsapp": "56912345003",
+        "nombre": "Carlos Rodríguez Testing",
+        "email": "carlos.rodriguez.testing@uniacc.test.com", 
+        "edad": 28,
+        "region": "Valparaíso",
+        "telefono": "965432100",
+        "tipo_consulta": "info_carreras",
+        "nivel_interes": "alto",
+        "fuente": "uniacc_chatbot",
+        "created_at": "now() - interval '5 days'",
+        "metadata": {
+          "previous_interaction": true,
+          "last_flow": "carreras_facultad_comunicaciones"
+        }
+      }
+    },
+    
+    "steps": [
+      {
+        "step": 1,
+        "action": "send_message",
+        "message": "hola",
+        "expected_response_contains": [
+          "¡Hola de nuevo Carlos Rodríguez Testing!",
+          "Te reconocí por tu WhatsApp",
+          "última vez consultaste sobre"
+        ],
+        "expected_state": "reconocimiento_usuario/menu_contextual",
+        "rpc_function_call": {
+          "function": "get_usuario_recurrente",
+          "parameters": ["56912345003", 30],
+          "expected_result": {
+            "found": true,
+            "nombre": "Carlos Rodríguez Testing",
+            "email": "carlos.rodriguez.testing@uniacc.test.com",
+            "es_reciente": true,
+            "tipo_consulta": "info_carreras"
+          }
+        },
+        "validation": {
+          "user_recognized": true,
+          "no_data_request": true,
+          "personalized_greeting": true
+        },
+        "timeout": 30,
+        "critical": true
+      },
+      {
+        "step": 2,
+        "action": "verify_contextual_menu",
+        "expected_menu_options": [
+          "1️⃣ Nueva consulta diferente",
+          "2️⃣ Seguir con información de carreras", 
+          "3️⃣ Hablar con un asesor",
+          "4️⃣ Ver mis datos registrados",
+          "5️⃣ Actualizar mi información"
+        ],
+        "expected_personalization": {
+          "previous_flow_referenced": true,
+          "faculty_context": "Comunicaciones",
+          "progress_preserved": true
+        },
+        "validation": {
+          "contextual_menu_shown": true,
+          "relevant_options": true,
+          "continuation_available": true
+        },
+        "timeout": 15
+      },
+      {
+        "step": 3,
+        "action": "send_message",
+        "message": "2",
+        "expected_response_contains": [
+          "Perfecto, continuemos con información de carreras",
+          "facultad te interesa más",
+          "A) Artes",
+          "B) Comunicaciones", 
+          "C) Arquitectura"
+        ],
+        "expected_state": "flujo_carreras/seleccionar_facultad",
+        "database_check": {
+          "table": "prospectos",
+          "conditions": {
+            "whatsapp": "56912345003",
+            "tipo_consulta": "info_carreras"
+          },
+          "should_not_duplicate": true
+        },
+        "validation": {
+          "flow_resumed": true,
+          "no_new_prospecto": true,
+          "context_maintained": true
+        },
+        "timeout": 30
+      },
+      {
+        "step": 4,
+        "action": "send_message",
+        "message": "B",
+        "expected_response_contains": [
+          "Comunicaciones",
+          "Audiovisual",
+          "Periodismo", 
+          "Publicidad"
+        ],
+        "expected_state": "flujo_carreras/comunicaciones/mostrar_programas",
+        "database_update_expected": {
+          "table": "prospectos",
+          "update_fields": {
+            "facultad_interes": "Comunicaciones",
+            "updated_at": "now()"
+          },
+          "should_not_create_new": true
+        },
+        "timeout": 30
+      }
+    ],
+    
+    "advanced_validations": [
+      {
+        "validation_type": "anti_duplicate_system",
+        "description": "Verificar que no se crea nuevo prospecto",
+        "checks": [
+          {
+            "query": "SELECT COUNT(*) FROM prospectos WHERE whatsapp = '56912345003'",
+            "expected_result": 1,
+            "message": "Debe existir exactamente 1 prospecto para este WhatsApp"
+          }
+        ]
+      },
+      {
+        "validation_type": "rpc_function_performance",
+        "description": "Verificar performance de get_usuario_recurrente",
+        "checks": [
+          {
+            "function": "get_usuario_recurrente",
+            "max_execution_time": 500,
+            "should_use_index": "idx_prospectos_reconocimiento"
+          }
+        ]
+      },
+      {
+        "validation_type": "user_experience",
+        "description": "Validar UX de reconocimiento",
+        "checks": [
+          {
+            "no_redundant_data_collection": true,
+            "personalized_experience": true,
+            "context_preservation": true,
+            "faster_interaction": true
+          }
+        ]
+      }
+    ],
+    
+    "success_criteria": [
+      "Usuario es reconocido automáticamente (saludo personalizado)",
+      "RPC get_usuario_recurrente() funciona correctamente < 500ms",
+      "Menú contextual se presenta con opciones relevantes",
+      "No se solicitan datos básicos nuevamente (UX mejorado)",
+      "Estado fluye correctamente a flujo específico elegido",
+      "NO se crea prospecto duplicado (sistema anti-duplicados)",
+      "Información previa se preserva y actualiza (no se pierde)",
+      "Performance superior a usuario nuevo (menos pasos)"
+    ],
+    
+    "business_impact": {
+      "user_experience": "Interacción más rápida y personalizada",
+      "conversion_rate": "Mayor probabilidad de completar consulta",
+      "data_quality": "Información acumulativa más rica",
+      "cost_efficiency": "Menos pasos = menor costo operativo"
+    },
+    
+    "cleanup": {
+      "delete_test_data": true,
+      "whatsapp_numbers": ["56912345003"],
+      "preserve_logs": true,
+      "clean_prerequisite_data": true
+    }
+  }
+}

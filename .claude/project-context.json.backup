@@ -1,0 +1,234 @@
+{
+    "project": {
+      "name": "UNIACC ChatBot - Sistema Completo de Captación de Prospectos",
+      "type": "microservices",
+      "repository": "https://github.com/direccionTIUniacc/chat-bot",
+      "version": "1.0.0",
+      "status": "Progressive Capture System Implementado",
+      "stack": [
+        "Node.js",
+        "TypeScript", 
+        "Vue.js 3",
+        "Express.js",
+        "Supabase PostgreSQL",
+        "WhatsApp Business API"
+      ],
+      "description": "Sistema de chatbot conversacional para UNIACC con captura progresiva de prospectos (zero data loss) y dashboard de gestión en tiempo real"
+    },
+    "architecture": {
+      "pattern": "microservices",
+      "services": [
+        {
+          "name": "ChatBot Backend",
+          "port": 3001,
+          "tech": "Node.js + TypeScript + Express",
+          "purpose": "Bot de WhatsApp y lógica conversacional",
+          "endpoints": ["/webhook", "/test-chat", "/chat", "/health", "/stats"]
+        },
+        {
+          "name": "Dashboard Frontend", 
+          "port": 3000,
+          "tech": "Vue.js 3 + Vite + TypeScript",
+          "purpose": "Interfaz web administrativa",
+          "features": ["Gestión prospectos", "Chat en tiempo real", "Métricas"]
+        },
+        {
+          "name": "Dashboard API Server",
+          "port": 3002,
+          "tech": "Node.js + Express",
+          "purpose": "API REST para el dashboard",
+          "endpoints": ["/api/prospectos", "/api/conversaciones", "/api/stats"]
+        }
+      ],
+      "database": {
+        "provider": "Supabase",
+        "type": "PostgreSQL",
+        "url": "https://vtwdmyezyvhprwonengu.supabase.co",
+        "tables": ["prospectos", "conversaciones", "mensajes", "ejecutivos"],
+        "rpc_functions": ["upsert_prospecto_por_whatsapp", "get_usuario_recurrente"],
+        "progressive_capture": {
+          "status": "implemented",
+          "capture_types": [
+            "captura en proceso",
+            "abandono solo nombre", 
+            "abandono con email",
+            "abandono con edad",
+            "abandono con region", 
+            "abandono incompleto",
+            "captura completa"
+          ],
+          "benefits": [
+            "Zero data loss - cada campo se guarda inmediatamente",
+            "Análisis granular de abandono por campo",
+            "Clasificación inteligente según completitud", 
+            "Recuperación de leads parciales"
+          ]
+        }
+      }
+    },
+    "currentSprint": {
+      "phase": "Progressive Capture System Implementado - Agosto 2025",
+      "completedFeatures": [
+        "✅ Chatbot completo con 5 flujos conversacionales",
+        "✅ Dashboard funcional con gestión de prospectos",
+        "✅ Integración Supabase con persistencia de datos", 
+        "✅ API REST completa para comunicación entre servicios",
+        "✅ Sistema de captura progresiva SIN PÉRDIDA DE DATOS",
+        "✅ Interfaz web de testing completamente funcional",
+        "✅ Gestión de estado avanzada por usuario con progressive capture",
+        "✅ Función RPC personalizada para evitar duplicados",
+        "✅ PROGRESSIVE CAPTURE: 7 tipos de clasificación de abandono",
+        "✅ Schema BD actualizado con constraints corregidos",
+        "✅ Interfaces TypeScript actualizadas (email/telefono nullable)",
+        "✅ Dashboard con formateo UI para tipos de abandono",
+        "✅ Métodos progresivos: crear, actualizar, finalizar prospecto",
+        "✅ Zero data loss implementado completamente"
+      ],
+      "nextPhase": [
+        "🔄 Testing exhaustivo del Progressive Capture System",
+        "🔄 Análisis de métricas de abandono por campo específico",
+        "🔄 Sistema de follow-up automático basado en abandono",
+        "🔄 Optimización basada en patrones de abandono detectados",
+        "🔄 Integración real con WhatsApp Business API",
+        "🔄 Notificaciones en tiempo real (WebSockets)", 
+        "🔄 Deploy en producción (AWS/GCP)",
+        "🔄 Tests automatizados (Jest/Cypress)",
+        "🔄 Métricas avanzadas y analytics con progressive data"
+      ],
+      "blockers": [],
+      "inProgress": []
+    },
+    "businessLogic": {
+      "chatbotFlows": [
+        "1️⃣ Conocer nuestras carreras (por facultad)",
+        "2️⃣ Proceso de admisión 2025",
+        "3️⃣ Costos y becas", 
+        "4️⃣ Modalidades de estudio",
+        "5️⃣ Hablar con un asesor"
+      ],
+      "facultades": [
+        "A) Artes: Teatro, Danza, Música, Artes Visuales",
+        "B) Comunicaciones: Audiovisual, Periodismo, Publicidad", 
+        "C) Arquitectura y Diseño: Arquitectura, Diseño de Interiores",
+        "D) Ciencias Jurídicas: Derecho, Psicología",
+        "E) Negocios y Tecnología: Ing. Comercial, Contador Auditor"
+      ],
+      "prospectoCaptureFlow": [
+        "1. Saludo inicial → Solicita nombre → CREA PROSPECTO INICIAL",
+        "2. Solicita email (con validación) → ACTUALIZA PROSPECTO",
+        "3. Solicita edad → ACTUALIZA PROSPECTO", 
+        "4. Solicita región → ACTUALIZA PROSPECTO",
+        "5. Solicita teléfono → FINALIZA PROSPECTO COMPLETO",
+        "6. Clasificación automática según punto de abandono",
+        "7. Zero data loss - todos los campos guardados inmediatamente"
+      ],
+      "progressiveCaptureStates": {
+        "captura_en_proceso": "Usuario completando datos activamente",
+        "abandono_solo_nombre": "Abandonó después de dar solo nombre",
+        "abandono_con_email": "Abandonó después de nombre + email",
+        "abandono_con_edad": "Abandonó después de nombre + email + edad",
+        "abandono_con_region": "Abandonó después de nombre + email + edad + región",
+        "abandono_incompleto": "Timeout durante proceso de captura",
+        "captura_completa": "Completó todos los campos incluyendo teléfono"
+      }
+    },
+    "conventions": {
+      "codeStyle": {
+        "backend": "TypeScript con tipado fuerte",
+        "frontend": "Vue 3 Composition API + TypeScript",
+        "naming": "camelCase para variables, PascalCase para componentes",
+        "database": "snake_case para tablas y campos"
+      },
+      "fileStructure": {
+        "chatbot": "src/{actions,data,utils}/",
+        "dashboard": "src/{components,composables,views,types}/",
+        "components": "Organizados por funcionalidad (chat/, prospectos/, layout/)"
+      },
+      "apiConventions": {
+        "endpoints": "REST con prefijo /api/",
+        "responses": "JSON estructurado con error handling",
+        "validation": "Sanitización en todas las entradas"
+      }
+    },
+    "environment": {
+      "development": {
+        "ports": {
+          "chatbot": 3001,
+          "dashboard": 3000, 
+          "api": 3002
+        },
+        "urls": {
+          "chatbot": "http://localhost:3001",
+          "chat_demo": "http://localhost:3001/chat",
+          "dashboard": "http://localhost:3000",
+          "api": "http://localhost:3002"
+        }
+      },
+      "requiredEnvVars": {
+        "chatbot": [
+          "SUPABASE_URL",
+          "SUPABASE_ANON_KEY", 
+          "VUE_WEBHOOK_URL",
+          "WHATSAPP_ACCESS_TOKEN",
+          "WHATSAPP_VERIFY_TOKEN"
+        ],
+        "dashboard": [
+          "VITE_SUPABASE_URL",
+          "VITE_SUPABASE_ANON_KEY"
+        ]
+      }
+    },
+    "testing": {
+      "chatDemo": "http://localhost:3001/chat - Interfaz completa de testing",
+      "apiEndpoints": "Todos los endpoints tienen health checks",
+      "dataValidation": "Validación de email, teléfono, campos requeridos",
+      "progressiveCaptureTesting": {
+        "status": "implemented_and_functional",
+        "scenarios": [
+          "Abandono después de nombre - crea prospecto inicial",
+          "Abandono después de email - actualiza con email",
+          "Abandono después de edad - actualiza con edad",
+          "Abandono después de región - actualiza con región", 
+          "Captura completa - finaliza con teléfono",
+          "Timeout scenarios - clasificación inteligente"
+        ]
+      }
+    },
+    "deployment": {
+      "current": "Desarrollo local",
+      "target": "Producción (AWS/GCP)",
+      "requirements": [
+        "WhatsApp Business API tokens reales",
+        "SSL certificates", 
+        "Environment variables de producción",
+        "CI/CD pipeline"
+      ]
+    },
+    "documentation": {
+      "README": "Completo con guía de inicio rápido",
+      "arquitectura": "Documentación técnica detallada",
+      "schemas": "Esquema completo de Supabase con RPC functions"
+    },
+    "lastUpdated": "2025-08-28",
+    "majorFeatures": {
+      "progressiveCaptureSystem": {
+        "implemented": "2025-08-28",
+        "description": "Sistema de captura progresiva sin pérdida de datos",
+        "files_modified": [
+          "chatbot/src/actions/uniacc-scripts.ts - Lógica principal progressive capture",
+          "chatbot/src/actions/supabase-integration.ts - Interfaces nullable",
+          "dashboard/server.js - API mapping para nuevos estados", 
+          "dashboard/src/types/prospecto.ts - Schema validation actualizado",
+          "dashboard/src/utils/formatters.ts - Formateo UI estados",
+          "update-tipo-consulta-progressive.sql - Constraints BD"
+        ],
+        "benefits": [
+          "Eliminación completa de pérdida de datos por abandono",
+          "Análisis granular de comportamiento de usuarios",
+          "Mejor calificación de leads parciales",
+          "Capacidad de follow-up mejorada"
+        ]
+      }
+    },
+    "maintainer": "Juan Pablo Silva"
+  }

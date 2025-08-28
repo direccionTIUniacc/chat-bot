@@ -24,7 +24,17 @@
     "debug-save": "echo 'Debugging guardado de prospectos:' && grep -A10 'Guardando\\|guardado exitosamente' log_chatbot.txt | tail -20",
     "monitor-live": "echo 'Monitoring en tiempo real:' && tail -f log_chatbot.txt log_dashboard_api.txt",
     "quick-diagnosis": "npm run performance-check && npm run analyze-errors && npm run check-services",
-    "full-context": "npm run init && npm run quick-diagnosis && echo 'Contexto completo cargado para Claude'"
+    "full-context": "npm run init && npm run quick-diagnosis && echo 'Contexto completo cargado para Claude'",
+    
+    "TESTING_COMMANDS": "--- Comandos de testing automatizado ---",
+    "run-test-scenario": "node templates/scripts/test-runner.js",
+    "test-progressive-capture": "node templates/scripts/test-runner.js progressive-capture-complete",
+    "test-abandono-email": "node templates/scripts/test-runner.js abandono-con-email", 
+    "test-returning-user": "node templates/scripts/test-runner.js returning-user-recognition",
+    "test-anti-duplicates": "node templates/scripts/test-runner.js anti-duplicates-validation",
+    "test-asesor-urgente": "node templates/scripts/test-runner.js asesor-urgente-flow",
+    "test-all-scenarios": "node templates/scripts/test-runner.js",
+    "test-with-services": "npm run pre-testing && npm run test-all-scenarios"
   },
   "keywords": [
     "claude-code",

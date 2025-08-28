@@ -38,7 +38,9 @@
       "Bash(cd .claude:*)",
       "Bash(netstat -an:*)",
       "Bash(ps aux:*)",
-      "Bash(stat:*)"
+      "Bash(stat:*)",
+      "Bash(npm run check-services:*)",
+      "Bash(npm run:*)"
     ],
     "deny": [
       "Bash(rm -rf:*)",

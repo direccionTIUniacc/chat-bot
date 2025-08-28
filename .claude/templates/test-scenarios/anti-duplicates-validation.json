@@ -1,0 +1,264 @@
+{
+  "name": "Sistema Anti-Duplicados - Validación Completa",
+  "description": "Test exhaustivo del sistema anti-duplicados y RPC functions críticas",
+  "version": "1.0",
+  "author": "UNIACC Testing System", 
+  "tags": ["anti-duplicates", "rpc-functions", "data-integrity", "business-critical"],
+  
+  "scenario": {
+    "user_id": "test_anti_duplicates_004",
+    "whatsapp": "56912345004", 
+    "expected_duration": "5-8 minutes",
+    "priority": "critical",
+    
+    "prerequisite": {
+      "action": "cleanup_existing_data",
+      "whatsapp_numbers": ["56912345004"]
+    },
+    
+    "test_phases": [
+      {
+        "phase": 1,
+        "name": "Captura Inicial Completa",
+        "description": "Crear prospecto inicial con datos completos",
+        "steps": [
+          {
+            "step": 1,
+            "action": "complete_progressive_capture",
+            "data": {
+              "nombre": "Ana Silva Testing",
+              "email": "ana.silva.testing@uniacc.test.com",
+              "edad": 22,
+              "region": "Biobío",
+              "telefono": "932100987"
+            },
+            "expected_result": "prospecto_created",
+            "database_validation": {
+              "table": "prospectos",
+              "conditions": {
+                "whatsapp": "56912345004",
+                "tipo_consulta": "captura completa",
+                "nombre": "Ana Silva Testing"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "phase": 2,
+        "name": "Flujo de Carreras - Actualización",
+        "description": "Completar flujo de carreras y verificar actualización (no duplicado)",
+        "steps": [
+          {
+            "step": 2,
+            "action": "send_message",
+            "message": "1",
+            "expected_response_contains": [
+              "Perfecto, exploremos nuestras carreras",
+              "facultad te interesa más"
+            ],
+            "expected_state": "flujo_carreras/seleccionar_facultad"
+          },
+          {
+            "step": 3,
+            "action": "send_message", 
+            "message": "D",
+            "expected_response_contains": [
+              "Ciencias Jurídicas",
+              "Derecho",
+              "Psicología"
+            ]
+          },
+          {
+            "step": 4,
+            "action": "send_message",
+            "message": "1",
+            "expected_response_contains": [
+              "Derecho",
+              "excelente elección"
+            ]
+          },
+          {
+            "step": 5,
+            "action": "complete_carreras_flow",
+            "expected_database_action": "update_existing_prospecto",
+            "database_validation": {
+              "table": "prospectos",
+              "conditions": {
+                "whatsapp": "56912345004",
+                "facultad_interes": "Ciencias Jurídicas",
+                "carrera_interes": "Derecho",
+                "tipo_consulta": "info_carreras"
+              },
+              "count_should_be": 1
+            }
+          }
+        ]
+      },
+      {
+        "phase": 3,
+        "name": "Reset y Nueva Consulta",
+        "description": "Verificar reset del sistema y reconocimiento en nueva consulta",
+        "steps": [
+          {
+            "step": 6,
+            "action": "wait_for_flow_completion",
+            "expected_reset_message": "Escribe 'Hola' para comenzar con una nueva consulta"
+          },
+          {
+            "step": 7,
+            "action": "send_message",
+            "message": "hola",
+            "expected_response_contains": [
+              "¡Hola de nuevo Ana Silva Testing!",
+              "última vez consultaste sobre Derecho"
+            ],
+            "expected_result": "recognized_as_returning_user",
+            "rpc_validation": {
+              "function": "get_usuario_recurrente", 
+              "should_find": true,
+              "should_be_recent": true
+            }
+          }
+        ]
+      },
+      {
+        "phase": 4,
+        "name": "Flujo de Asesor - Actualización Urgente",
+        "description": "Test de actualización a prioridad urgente",
+        "steps": [
+          {
+            "step": 8,
+            "action": "send_message",
+            "message": "5",
+            "expected_response_contains": [
+              "hablar con uno de nuestros asesores",
+              "se contactará contigo"
+            ],
+            "database_validation": {
+              "table": "prospectos",
+              "conditions": {
+                "whatsapp": "56912345004",
+                "tipo_consulta": "solicitud de asesor",
+                "nivel_interes": "urgente",
+                "fuente": "asesor_request"
+              },
+              "count_should_be": 1
+            }
+          }
+        ]
+      }
+    ],
+    
+    "rpc_function_tests": [
+      {
+        "function": "upsert_prospecto_por_whatsapp",
+        "test_cases": [
+          {
+            "name": "prospecto_reciente_existe",
+            "description": "Verificar que no crea duplicado si existe prospecto reciente",
+            "parameters": {
+              "p_whatsapp": "56912345004",
+              "p_nombre": "Ana Silva Duplicate Test",
+              "p_email": "duplicate@test.com",
+              "p_horas_limite": 24
+            },
+            "expected_result": {
+              "es_nuevo": false,
+              "mensaje": "Prospecto existente encontrado (anti-duplicados)"
+            }
+          },
+          {
+            "name": "prospecto_antiguo_permite_nuevo",
+            "description": "Verificar que sí crea nuevo si prospecto es muy antiguo",
+            "setup": "UPDATE prospectos SET created_at = now() - interval '48 hours' WHERE whatsapp = '56912345004'",
+            "parameters": {
+              "p_whatsapp": "56912345004",
+              "p_nombre": "Ana Silva New",
+              "p_horas_limite": 24
+            },
+            "expected_result": {
+              "es_nuevo": true,
+              "mensaje": "Nuevo prospecto creado exitosamente"
+            }
+          }
+        ]
+      },
+      {
+        "function": "get_usuario_recurrente",
+        "test_cases": [
+          {
+            "name": "usuario_dentro_limite",
+            "parameters": ["56912345004", 30],
+            "expected_result": {
+              "found": true,
+              "es_reciente": true
+            }
+          },
+          {
+            "name": "usuario_fuera_limite",
+            "parameters": ["56912345004", 1],
+            "expected_result": {
+              "found": true,
+              "es_reciente": false
+            }
+          }
+        ]
+      }
+    ],
+    
+    "advanced_validations": [
+      {
+        "validation_type": "data_integrity",
+        "description": "Verificar integridad completa de datos",
+        "checks": [
+          {
+            "check": "unique_whatsapp_per_timeframe",
+            "query": "SELECT COUNT(*) FROM prospectos WHERE whatsapp = '56912345004' AND created_at >= now() - interval '24 hours'",
+            "expected_max": 1
+          },
+          {
+            "check": "progressive_updates_preserved",
+            "description": "Verificar que actualizaciones progresivas se mantienen",
+            "fields_should_accumulate": ["facultad_interes", "carrera_interes", "nivel_interes"]
+          }
+        ]
+      },
+      {
+        "validation_type": "performance",
+        "description": "Verificar performance de operaciones anti-duplicados", 
+        "metrics": {
+          "rpc_upsert_max_time": 800,
+          "rpc_get_usuario_max_time": 500,
+          "database_update_max_time": 300
+        }
+      }
+    ],
+    
+    "success_criteria": [
+      "Solo 1 prospecto creado para mismo WhatsApp en ventana de tiempo",
+      "RPC upsert_prospecto_por_whatsapp funciona correctamente",
+      "Múltiples flujos actualizan mismo prospecto (no crean nuevos)",
+      "Reset de estado funciona entre consultas",
+      "Reconocimiento funciona en consultas posteriores", 
+      "Escalation a 'urgente' funciona para flujo de asesor",
+      "Performance de RPC functions dentro de límites aceptables",
+      "Datos se acumulan progresivamente (no se pierden)"
+    ],
+    
+    "business_critical_validations": [
+      "No pérdida de leads por duplicación",
+      "Calidad de datos mantenida",
+      "Experience de usuario consistente",
+      "Escalation de prioridades funcional",
+      "ROI del sistema optimizado"
+    ],
+    
+    "cleanup": {
+      "delete_test_data": true,
+      "whatsapp_numbers": ["56912345004"],
+      "preserve_logs": true,
+      "reset_sequences": true
+    }
+  }
+}

@@ -1,0 +1,189 @@
+{
+  "name": "Progressive Capture - Flujo Completo",
+  "description": "Test del sistema de captura progresiva completo sin abandonos",
+  "version": "1.0",
+  "author": "UNIACC Testing System",
+  "tags": ["progressive-capture", "complete-flow", "zero-data-loss"],
+  
+  "scenario": {
+    "user_id": "test_user_progressive_complete_001",
+    "whatsapp": "56912345001",
+    "expected_duration": "3-5 minutes",
+    "priority": "high",
+    
+    "prerequisite": {
+      "action": "cleanup_existing_data",
+      "whatsapp_numbers": ["56912345001"]
+    },
+    
+    "steps": [
+      {
+        "step": 1,
+        "action": "send_message",
+        "message": "hola",
+        "expected_response_contains": [
+          "¡Hola! 🎓 Soy el asistente virtual de UNIACC",
+          "¿Cuál es tu nombre completo?"
+        ],
+        "expected_state": "captura_inicial/solicitar_nombre",
+        "database_check": {
+          "table": "prospectos",
+          "should_exist": false,
+          "whatsapp": "56912345001"
+        },
+        "timeout": 30,
+        "critical": true
+      },
+      {
+        "step": 2,
+        "action": "send_message",
+        "message": "Juan Pérez Testing",
+        "expected_response_contains": [
+          "Perfecto Juan Pérez Testing",
+          "correo electrónico"
+        ],
+        "expected_state": "captura_inicial/solicitar_email",
+        "database_check": {
+          "table": "prospectos",
+          "should_exist": true,
+          "conditions": {
+            "whatsapp": "56912345001",
+            "nombre": "Juan Pérez Testing",
+            "tipo_consulta": "captura en proceso",
+            "email": null
+          }
+        },
+        "validation": {
+          "prospecto_created": true,
+          "immediate_save": true
+        },
+        "timeout": 30,
+        "critical": true
+      },
+      {
+        "step": 3,
+        "action": "send_message",
+        "message": "juan.perez.testing@uniacc.test.com",
+        "expected_response_contains": [
+          "Gracias por tu email",
+          "¿Cuál es tu edad?"
+        ],
+        "expected_state": "captura_inicial/solicitar_edad",
+        "database_check": {
+          "table": "prospectos",
+          "conditions": {
+            "whatsapp": "56912345001",
+            "email": "juan.perez.testing@uniacc.test.com",
+            "tipo_consulta": "captura en proceso"
+          }
+        },
+        "validation": {
+          "email_saved": true,
+          "valid_email_format": true
+        },
+        "timeout": 30,
+        "critical": true
+      },
+      {
+        "step": 4,
+        "action": "send_message",
+        "message": "25",
+        "expected_response_contains": [
+          "tienes 25 años",
+          "¿En qué región vives?"
+        ],
+        "expected_state": "captura_inicial/solicitar_region",
+        "database_check": {
+          "table": "prospectos",
+          "conditions": {
+            "whatsapp": "56912345001",
+            "edad": 25,
+            "tipo_consulta": "captura en proceso"
+          }
+        },
+        "validation": {
+          "age_saved": true,
+          "age_is_numeric": true
+        },
+        "timeout": 30,
+        "critical": true
+      },
+      {
+        "step": 5,
+        "action": "send_message",
+        "message": "7",
+        "expected_response_contains": [
+          "Región Metropolitana",
+          "número de teléfono"
+        ],
+        "expected_state": "captura_inicial/solicitar_telefono",
+        "database_check": {
+          "table": "prospectos",
+          "conditions": {
+            "whatsapp": "56912345001",
+            "region": "Metropolitana",
+            "tipo_consulta": "captura en proceso"
+          }
+        },
+        "validation": {
+          "region_saved": true,
+          "region_mapped_correctly": true
+        },
+        "timeout": 30,
+        "critical": true
+      },
+      {
+        "step": 6,
+        "action": "send_message",
+        "message": "987654321",
+        "expected_response_contains": [
+          "¡Perfecto!",
+          "explorar nuestras opciones",
+          "1️⃣ Conocer nuestras carreras",
+          "2️⃣ Proceso de admisión",
+          "3️⃣ Costos y becas",
+          "4️⃣ Modalidades de estudio",
+          "5️⃣ Hablar con un asesor"
+        ],
+        "expected_state": "menu_principal/null",
+        "database_check": {
+          "table": "prospectos",
+          "conditions": {
+            "whatsapp": "56912345001",
+            "telefono": "987654321",
+            "tipo_consulta": "captura completa"
+          }
+        },
+        "validation": {
+          "telefono_saved": true,
+          "capture_completed": true,
+          "reached_main_menu": true
+        },
+        "timeout": 30,
+        "critical": true
+      }
+    ],
+    
+    "success_criteria": [
+      "Usuario completa captura de todos los campos requeridos",
+      "Cada campo se guarda inmediatamente en BD (Progressive Capture)",
+      "Estado evoluciona: 'captura en proceso' → 'captura completa'",
+      "No se crean prospectos duplicados",
+      "Usuario llega al menú principal con todas las opciones",
+      "Tiempo total < 5 minutos",
+      "Zero data loss - todos los campos preservados"
+    ],
+    
+    "performance_metrics": {
+      "max_response_time": 2000,
+      "max_db_save_time": 1000,
+      "max_total_duration": 300
+    },
+    
+    "cleanup": {
+      "delete_test_data": true,
+      "whatsapp_numbers": ["56912345001"],
+      "preserve_logs": true
+    }
+  }
+}

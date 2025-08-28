@@ -1,0 +1,144 @@
+{
+  "name": "Progressive Capture - Abandono con Email",
+  "description": "Test de abandono después de capturar nombre + email (clasificación granular)",
+  "version": "1.0",
+  "author": "UNIACC Testing System",
+  "tags": ["progressive-capture", "abandono", "email-stage", "data-preservation"],
+  
+  "scenario": {
+    "user_id": "test_user_abandono_email_002",
+    "whatsapp": "56912345002", 
+    "expected_duration": "2-3 minutes + timeout",
+    "priority": "high",
+    
+    "prerequisite": {
+      "action": "cleanup_existing_data",
+      "whatsapp_numbers": ["56912345002"]
+    },
+    
+    "steps": [
+      {
+        "step": 1,
+        "action": "send_message",
+        "message": "hola",
+        "expected_response_contains": [
+          "¡Hola! 🎓 Soy el asistente virtual de UNIACC",
+          "¿Cuál es tu nombre completo?"
+        ],
+        "expected_state": "captura_inicial/solicitar_nombre",
+        "timeout": 30
+      },
+      {
+        "step": 2,
+        "action": "send_message",
+        "message": "María González Testing",
+        "expected_response_contains": [
+          "Perfecto María González Testing",
+          "correo electrónico"
+        ],
+        "expected_state": "captura_inicial/solicitar_email",
+        "database_check": {
+          "table": "prospectos",
+          "conditions": {
+            "whatsapp": "56912345002",
+            "nombre": "María González Testing",
+            "tipo_consulta": "captura en proceso",
+            "email": null,
+            "edad": null,
+            "telefono": null
+          }
+        },
+        "validation": {
+          "name_saved_immediately": true,
+          "partial_prospecto_created": true
+        },
+        "timeout": 30
+      },
+      {
+        "step": 3,
+        "action": "send_message",
+        "message": "maria.gonzalez.testing@uniacc.test.com",
+        "expected_response_contains": [
+          "Gracias por tu email",
+          "¿Cuál es tu edad?"
+        ],
+        "expected_state": "captura_inicial/solicitar_edad",
+        "database_check": {
+          "table": "prospectos",
+          "conditions": {
+            "whatsapp": "56912345002",
+            "nombre": "María González Testing",
+            "email": "maria.gonzalez.testing@uniacc.test.com",
+            "tipo_consulta": "captura en proceso",
+            "edad": null,
+            "telefono": null
+          }
+        },
+        "validation": {
+          "email_saved_immediately": true,
+          "still_in_process": true
+        },
+        "timeout": 30,
+        "critical": true
+      },
+      {
+        "step": 4,
+        "action": "simulate_user_abandonment",
+        "abandonment_type": "no_response",
+        "timeout_minutes": 15,
+        "expected_result": "timeout_handler_triggered",
+        "expected_classification": "abandono con email"
+      }
+    ],
+    
+    "post_abandonment_validation": [
+      {
+        "check_type": "database_state",
+        "table": "prospectos",
+        "expected_conditions": {
+          "whatsapp": "56912345002",
+          "nombre": "María González Testing",
+          "email": "maria.gonzalez.testing@uniacc.test.com",
+          "tipo_consulta": "abandono con email",
+          "edad": null,
+          "region": null,
+          "telefono": null
+        }
+      },
+      {
+        "check_type": "data_preservation",
+        "preserved_fields": ["nombre", "email", "whatsapp", "created_at"],
+        "null_fields": ["edad", "region", "telefono"]
+      },
+      {
+        "check_type": "follow_up_eligibility", 
+        "should_be_eligible": true,
+        "follow_up_type": "email_marketing",
+        "lead_quality": "medium"
+      }
+    ],
+    
+    "success_criteria": [
+      "Datos parciales se conservan en BD (Zero Data Loss)",
+      "tipo_consulta se actualiza automáticamente a 'abandono con email'", 
+      "Campos no capturados permanecen null (no datos falsos)",
+      "Prospecto queda disponible para follow-up con email válido",
+      "Sistema detecta abandono automáticamente (timeout handler)",
+      "No se pierde la información ya capturada",
+      "Clasificación granular permite análisis específico"
+    ],
+    
+    "business_value": {
+      "lead_recovery": "Email disponible para remarketing",
+      "analytics_value": "Identifica fricción en paso de edad",
+      "follow_up_strategy": "Email sequence para usuarios parciales"
+    },
+    
+    "cleanup": {
+      "delete_test_data": true,
+      "whatsapp_numbers": ["56912345002"],
+      "preserve_logs": true,
+      "note": "Este prospecto parcial es valioso para follow-up"
+    }
+  }
+}

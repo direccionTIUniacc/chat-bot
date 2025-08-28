@@ -835,6 +835,3 @@ create trigger trigger_update_prospecto_metadata
     for each row
 execute procedure update_prospecto_metadata();
 
-comment on index idx_prospectos_reconocimiento is 'Índice optimizado para consultas de reconocimiento de usuarios por WhatsApp y fecha.';
-comment on view usuarios_recurrentes is 'Vista optimizada para reconocimiento de usuarios recurrentes con información de recencia y número de consultas.';
-comment on function get_usuario_recurrente(text, integer) is 'Función para obtener información de usuarios recurrentes por WhatsApp. Usado para reconocimiento automático en múltiples consultas.';

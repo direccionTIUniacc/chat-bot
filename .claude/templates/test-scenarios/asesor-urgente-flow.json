@@ -1,0 +1,295 @@
+{
+  "name": "Flujo Asesor - Prioridad Urgente",
+  "description": "Test del flujo crítico de solicitud de asesor con escalation automático",
+  "version": "1.0",
+  "author": "UNIACC Testing System",
+  "tags": ["asesor-request", "urgent-priority", "webhook", "business-critical"],
+  
+  "scenario": {
+    "user_id": "test_asesor_urgente_005", 
+    "whatsapp": "56912345005",
+    "expected_duration": "3-4 minutes",
+    "priority": "critical",
+    "business_impact": "high",
+    
+    "prerequisite": {
+      "action": "cleanup_existing_data",
+      "whatsapp_numbers": ["56912345005"],
+      "verify_webhook_endpoint": "http://localhost:3002/api/botpress-webhook"
+    },
+    
+    "steps": [
+      {
+        "step": 1,
+        "action": "complete_progressive_capture",
+        "description": "Captura inicial completa para habilitar flujo de asesor",
+        "data": {
+          "nombre": "Pedro Morales Testing",
+          "email": "pedro.morales.testing@uniacc.test.com",
+          "edad": 30,
+          "region": "Antofagasta",
+          "telefono": "945678123"
+        },
+        "expected_state": "menu_principal/null",
+        "database_validation": {
+          "table": "prospectos",
+          "conditions": {
+            "whatsapp": "56912345005",
+            "tipo_consulta": "captura completa",
+            "nivel_interes": "alto"
+          }
+        },
+        "timeout": 60
+      },
+      {
+        "step": 2,
+        "action": "send_message",
+        "message": "5",
+        "description": "Seleccionar opción 'Hablar con un asesor'",
+        "expected_response_contains": [
+          "📞 ¡Perfecto! Quieres hablar con uno de nuestros asesores",
+          "especializado en admisiones",
+          "En breve un asesor se contactará contigo",
+          "horario de atención"
+        ],
+        "expected_state": "flujo_asesor/solicitud_completada",
+        "timeout": 30,
+        "critical": true
+      },
+      {
+        "step": 3,
+        "action": "verify_database_update",
+        "description": "Verificar actualización inmediata a prioridad urgente",
+        "expected_updates": {
+          "table": "prospectos",
+          "conditions": {
+            "whatsapp": "56912345005",
+            "tipo_consulta": "solicitud de asesor",
+            "nivel_interes": "urgente",
+            "fuente": "asesor_request"
+          }
+        },
+        "performance_check": {
+          "max_update_time": 1000,
+          "should_be_immediate": true
+        },
+        "critical": true
+      },
+      {
+        "step": 4,
+        "action": "verify_webhook_call",
+        "description": "Verificar envío de webhook al dashboard",
+        "expected_webhook": {
+          "url": "http://localhost:3002/api/botpress-webhook",
+          "method": "POST",
+          "payload_must_contain": {
+            "nombre": "Pedro Morales Testing",
+            "email": "pedro.morales.testing@uniacc.test.com",
+            "whatsapp": "56912345005",
+            "source": "asesor_request",
+            "flujo_actual": "hablar_asesor", 
+            "estado": "nuevo"
+          },
+          "headers": {
+            "Content-Type": "application/json"
+          }
+        },
+        "webhook_response_validation": {
+          "expected_status": 200,
+          "expected_response_body": {
+            "success": true,
+            "prospecto_id": "uuid_format"
+          }
+        },
+        "performance_check": {
+          "max_webhook_time": 2000
+        },
+        "critical": true
+      },
+      {
+        "step": 5,
+        "action": "verify_dashboard_integration",
+        "description": "Verificar que prospecto aparece correctamente en dashboard", 
+        "dashboard_checks": [
+          {
+            "check_type": "api_endpoint",
+            "endpoint": "http://localhost:3002/api/prospectos",
+            "filter": "nivel_interes=urgente",
+            "should_contain": {
+              "whatsapp": "56912345005",
+              "tipo_consulta": "solicitud de asesor"
+            }
+          },
+          {
+            "check_type": "priority_filtering",
+            "endpoint": "http://localhost:3002/api/prospectos?priority=urgent",
+            "should_find_prospecto": true
+          }
+        ]
+      },
+      {
+        "step": 6,
+        "action": "verify_ui_elements",
+        "description": "Verificar elementos visuales de prioridad en dashboard",
+        "ui_validations": [
+          {
+            "element": "priority_badge",
+            "should_display": "URGENTE",
+            "color": "red",
+            "visible": true
+          },
+          {
+            "element": "timestamp_solicitud",
+            "should_be_recent": true,
+            "format": "relative_time"
+          },
+          {
+            "element": "contact_info",
+            "should_show": ["nombre", "email", "telefono"],
+            "easily_accessible": true
+          }
+        ]
+      }
+    ],
+    
+    "advanced_validations": [
+      {
+        "validation_type": "business_process",
+        "description": "Validar proceso completo de escalation",
+        "checks": [
+          {
+            "check": "automatic_priority_escalation",
+            "from_level": "alto",
+            "to_level": "urgente",
+            "trigger": "asesor_request_flow"
+          },
+          {
+            "check": "source_tracking",
+            "original_source": "uniacc_chatbot",
+            "escalated_source": "asesor_request",
+            "maintains_history": true
+          },
+          {
+            "check": "notification_system",
+            "webhook_delivered": true,
+            "dashboard_updated": true,
+            "ready_for_assignment": true
+          }
+        ]
+      },
+      {
+        "validation_type": "data_flow",
+        "description": "Validar flujo completo de datos",
+        "flow_validation": [
+          {
+            "stage": "chatbot_capture",
+            "data_complete": true,
+            "validation_passed": true
+          },
+          {
+            "stage": "priority_escalation", 
+            "level_updated": "urgente",
+            "type_updated": "solicitud de asesor"
+          },
+          {
+            "stage": "webhook_transmission",
+            "payload_sent": true,
+            "response_received": true
+          },
+          {
+            "stage": "dashboard_integration",
+            "visible_in_ui": true,
+            "filterable": true,
+            "actionable": true
+          }
+        ]
+      },
+      {
+        "validation_type": "performance_sla",
+        "description": "Validar SLA de respuesta para casos urgentes",
+        "sla_metrics": {
+          "escalation_time": "< 500ms",
+          "webhook_delivery_time": "< 2000ms", 
+          "dashboard_visibility_time": "< 3000ms",
+          "total_end_to_end_time": "< 5000ms"
+        }
+      }
+    ],
+    
+    "integration_tests": [
+      {
+        "test_type": "webhook_reliability",
+        "description": "Test de confiabilidad del webhook",
+        "scenarios": [
+          {
+            "scenario": "webhook_success",
+            "expected": "200_response"
+          },
+          {
+            "scenario": "webhook_timeout",
+            "expected": "retry_mechanism",
+            "max_retries": 3
+          },
+          {
+            "scenario": "webhook_failure",
+            "expected": "fallback_logging"
+          }
+        ]
+      },
+      {
+        "test_type": "dashboard_real_time",
+        "description": "Test de actualización en tiempo real",
+        "checks": [
+          {
+            "check": "immediate_visibility",
+            "max_delay": 1000
+          },
+          {
+            "check": "sorting_by_priority",
+            "urgent_appears_first": true
+          },
+          {
+            "check": "visual_indicators",
+            "badge_color": "red",
+            "highlighting": true
+          }
+        ]
+      }
+    ],
+    
+    "success_criteria": [
+      "Prospecto se marca automáticamente con nivel_interes = 'urgente'",
+      "tipo_consulta se actualiza a 'solicitud de asesor'",
+      "Webhook se envía exitosamente al dashboard < 2000ms",
+      "Dashboard recibe y procesa correctamente la solicitud",
+      "Prospecto aparece visualmente destacado con prioridad URGENTE",
+      "Fuente se actualiza a 'asesor_request' para tracking",
+      "Información completa está disponible para asignación",
+      "Proceso completo end-to-end < 5 segundos",
+      "No se crean duplicados durante escalation",
+      "Sistema está listo para asignación a ejecutivo"
+    ],
+    
+    "business_validation": {
+      "revenue_impact": "Leads urgentes tienen 3x mayor probabilidad de conversión",
+      "response_time_requirement": "Asesores deben contactar en < 2 horas",
+      "tracking_requirement": "100% de solicitudes deben ser rastreables",
+      "escalation_effectiveness": "Reduce tiempo de respuesta de 24h a 2h"
+    },
+    
+    "failure_impact": {
+      "lost_revenue": "Alto - leads urgentes son más valiosos",
+      "user_experience": "Crítico - expectativa de contacto rápido", 
+      "competitive_disadvantage": "Otros competidores responden más rápido",
+      "brand_reputation": "Afecta percepción de profesionalismo"
+    },
+    
+    "cleanup": {
+      "delete_test_data": true,
+      "whatsapp_numbers": ["56912345005"],
+      "preserve_logs": true,
+      "clear_webhook_logs": false,
+      "note": "Preservar logs de webhook para análisis de performance"
+    }
+  }
+}

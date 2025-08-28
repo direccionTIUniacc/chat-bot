@@ -51,7 +51,7 @@ Progressive Capture → Selecciona flujo → Completa flujo → ACTUALIZA PROSPE
 ### Clasificación Automática de Prospectos + Progressive Capture
 **Flujos Informativos:**
 - **Consulta General** (`alto`) - Flujos informativos
-- **Costos y Becas** (`alto`) - Interés en financiamiento
+- **Costos y Becas** (`alto`) - Interés en financiamiento  
 - **Modalidades de Estudio** (`alto`) - Interés en formatos
 - **Exploración de Carreras** (`alto`) - Interés académico
 - **Solicitud de Asesor** (`urgente`) - **PRIORIDAD MÁXIMA**
@@ -59,7 +59,7 @@ Progressive Capture → Selecciona flujo → Completa flujo → ACTUALIZA PROSPE
 **Estados Progressive Capture:**
 - `captura en proceso` - Usuario completando datos activamente
 - `abandono solo nombre` - Abandonó después de dar solo nombre
-- `abandono con email` - Abandonó después de nombre + email
+- `abandono con email` - Abandonó después de nombre + email  
 - `abandono con edad` - Abandonó después de nombre + email + edad
 - `abandono con region` - Abandonó después de nombre + email + edad + región
 - `abandono incompleto` - Timeout durante proceso
@@ -68,9 +68,9 @@ Progressive Capture → Selecciona flujo → Completa flujo → ACTUALIZA PROSPE
 ### Base de Datos (Supabase) - ACTUALIZADA
 - **prospectos**: Datos principales con PROGRESSIVE CAPTURE (7 tipos abandono)
 - **conversaciones**: Sesiones de chat por teléfono
-- **mensajes**: Historial completo de intercambios
+- **mensajes**: Historial completo de intercambios  
 - **ejecutivos**: Gestión de asesores para prospectos urgentes
-- **Constraints actualizados**:
+- **Constraints actualizados**: 
   - `prospectos_fuente_check` incluye `asesor_request`, `uniacc_chatbot`, `demo_chatbot`
   - `prospectos_nivel_interes_check` incluye `urgente`
 - **RPC**: `upsert_prospecto_por_whatsapp()` evita duplicados
@@ -101,7 +101,7 @@ Progressive Capture → Selecciona flujo → Completa flujo → ACTUALIZA PROSPE
 - **Mapeo automático** de tipos de consulta:
   - `consulta_general` → `consulta general`
   - `costos_becas` → `consulta costos y/o becas`
-  - `modalidades_estudio` → `consulta modalidades de estudio`
+  - `modalidades_estudio` → `consulta modalidades de estudio`  
   - `hablar_asesor` → `solicitud de asesor`
 - **Gestión de prioridades**: `urgente` para solicitudes de asesor
 - **CORS configurado** para desarrollo
@@ -139,7 +139,7 @@ cd dashboard && npm run dev:full
 # Terminal 1: ChatBot Backend
 cd chatbot && npm run dev
 
-# Terminal 2: Dashboard API Server
+# Terminal 2: Dashboard API Server  
 cd dashboard && npm run dev:server
 
 # Terminal 3: Dashboard Frontend
@@ -219,12 +219,12 @@ cd dashboard && npm run dev
 - **Datos**: Se guardan en Supabase con anti-duplicados y clasificación automática
 
 ### Flujo de Prueba Actualizado (Testing Múltiples Consultas)
-1. **Primera Consulta**:
+1. **Primera Consulta**: 
    - Ir a http://localhost:3001/chat
    - Completar captura inicial (nombre, email, edad, región, teléfono)
    - Seleccionar opción del menú (1-5) y completar flujo
    - Verificar guardado en dashboard
-
+   
 2. **Segunda Consulta (Reconocimiento)**:
    - Escribir "Hola" para nueva consulta
    - Verificar menú contextual con datos pre-cargados
@@ -243,7 +243,7 @@ cd dashboard && npm run dev
 
 ### Archivos Clave (ACTUALIZADOS)
 - **README.md**: Guía completa con nuevas funcionalidades
-- **arquitectura.md**: Documentación técnica v2.0 actualizada
+- **arquitectura.md**: Documentación técnica v2.0 actualizada  
 - **test.md**: Plan de testing de 5 escenarios de usuarios
 - **flujos.md**: Diagramas de todos los flujos del chatbot
 - **migration_multiple_consultas.sql**: Migración completa de BD
@@ -258,7 +258,7 @@ SUPABASE_URL=https://vtwdmyezyvhprwonengu.supabase.co
 SUPABASE_ANON_KEY=eyJhbGciOi...
 VUE_WEBHOOK_URL=http://localhost:3002/api/botpress-webhook  # ← ACTUALIZADO
 
-# Dashboard
+# Dashboard  
 VITE_SUPABASE_URL=https://vtwdmyezyvhprwonengu.supabase.co
 VITE_SUPABASE_ANON_KEY=eyJhbGciOi...
 ```
@@ -268,7 +268,7 @@ VITE_SUPABASE_ANON_KEY=eyJhbGciOi...
 ### Al trabajar en el proyecto, SIEMPRE:
 1. **Revisar este contexto primero** antes de hacer cambios
 2. **Mantener el sistema anti-duplicados** - 1 prospecto por flujo
-3. **Probar reset automático** en `/chat`
+3. **Probar reset automático** en `/chat` 
 4. **Verificar clasificación** de prospectos en dashboard
 5. **Respetar constraints** de base de datos actualizados
 6. **Mantener consistencia** entre los 3 microservicios
@@ -312,7 +312,7 @@ VITE_SUPABASE_ANON_KEY=eyJhbGciOi...
 - **Errores de fetch**: Dashboard muestra errores durante testing
 - **Menu contextual**: Corregido procesamiento de opciones generales
 
-### ✅ Mejoras de Rendimiento
+### ✅ Mejoras de Rendimiento  
 - **Índices optimizados** para reconocimiento de usuarios
 - **RPC functions** para consultas complejas
 - **Vista materializada** usuarios_recurrentes

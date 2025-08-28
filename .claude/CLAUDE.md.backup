@@ -28,49 +28,6 @@ UNIACC-ChatBot/
 - **API Health**: http://localhost:3002/health
 - **Bot Stats**: http://localhost:3001/stats
 
-## SISTEMA DE TESTING AUTOMATIZADO ✅
-
-### Testing Framework Completo (IMPLEMENTADO - Agosto 2025)
-El proyecto cuenta con un sistema completo de testing automatizado para validar todos los flujos críticos del Progressive Capture System.
-
-#### Comandos de Testing Disponibles
-```bash
-# Tests individuales por escenario
-npm run test-progressive-capture    # Flujo completo de captura
-npm run test-abandono-email        # Abandono después de email
-npm run test-returning-user         # Reconocimiento de usuarios
-npm run test-anti-duplicates        # Sistema anti-duplicados
-npm run test-asesor-urgente         # Flujo asesor urgente
-
-# Tests masivos
-npm run run-test-scenario           # Comando principal
-npm run test-all-scenarios          # Todos los escenarios
-npm run test-with-services          # Con verificación previa
-```
-
-#### Escenarios Críticos Testeados
-1. **Progressive Capture Complete** - Flujo completo sin abandonos
-2. **Abandono con Email** - Manejo de abandonos parciales
-3. **Returning User Recognition** - Sistema de reconocimiento automático
-4. **Anti-Duplicates Validation** - Prevención de prospectos duplicados
-5. **Asesor Urgente Flow** - Flujo crítico de solicitud de asesor
-
-#### Validaciones Automáticas
-- ✅ **Zero Data Loss**: Cada campo se guarda inmediatamente en BD
-- ✅ **Estado Evolution**: `captura en proceso` → `captura completa`
-- ✅ **Database Consistency**: Verificación de constraints y RPC functions
-- ✅ **Response Validation**: Validación de respuestas del bot
-- ✅ **Performance Metrics**: Tiempos de respuesta y procesamiento
-
-#### Estructura del Sistema de Testing
-```
-.claude/templates/
-├── test-scenarios/    # Escenarios en JSON
-├── scripts/          # Motor de ejecución
-├── reports/          # Reportes generados
-└── README.md         # Documentación completa
-```
-
 ## ARCHIVOS DINÁMICOS CRÍTICOS
 
 ### Archivos que se actualizan durante desarrollo:
@@ -180,7 +137,7 @@ cd dashboard && npm run dev:full
 
 # Opción separada - 3 terminales
 cd chatbot && npm run dev        # Terminal 1
-cd dashboard && npm run dev:server  # Terminal 2
+cd dashboard && npm run dev:server  # Terminal 2  
 cd dashboard && npm run dev      # Terminal 3
 ```
 
@@ -235,7 +192,7 @@ cd dashboard && npm run dev      # Terminal 3
 ### Cuando Claude necesite diagnosticar:
 1. **Ejecutar contexto**: `npm run init`
 2. **Verificar servicios**: `npm run check-services`
-3. **Analizar logs**: `npm run debug-logs`
+3. **Analizar logs**: `npm run debug-logs` 
 4. **Revisar errores**: `npm run analyze-errors`
 5. **Consultar schema**: Si hay errores de BD, revisar `supabase_config_actual.sql`
 

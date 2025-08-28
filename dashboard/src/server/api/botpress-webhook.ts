@@ -58,6 +58,7 @@ async function processLeadCaptured(eventData: any) {
     console.log('📊 Procesando prospecto UNIACC:', eventData)
     console.log('🔧 DEBUG - flujo_actual recibido:', eventData.flujo_actual)
     console.log('🔧 DEBUG - tipo_consulta mapeado:', mapearFlujoATipoConsulta(eventData.flujo_actual))
+    console.log('🔍 DEBUG - eventData completo:', JSON.stringify(eventData, null, 2))
 
     // Crear prospecto en Supabase con estructura UNIACC
     const { data, error } = await supabase
@@ -67,7 +68,10 @@ async function processLeadCaptured(eventData: any) {
         email: eventData.email,
         telefono: eventData.telefono,
         whatsapp: eventData.whatsapp,
+        edad: eventData.edad,
+        region: eventData.region,
         carrera_interes: eventData.carrera_interes,
+        facultad_interes: eventData.facultad_interes,
         nivel_interes: determinarNivelInteres(mapearFlujoATipoConsulta(eventData.flujo_actual), eventData.nivel_interes),
         fuente: eventData.source || 'uniacc_chatbot',
         estado: 'nuevo',

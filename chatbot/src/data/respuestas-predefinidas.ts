@@ -11,6 +11,7 @@ export const RESPUESTAS = {
 3️⃣ **Costos y becas**
 4️⃣ **Modalidades de estudio**
 5️⃣ **Hablar con un asesor**
+6️⃣ **🚀 Ya sé qué carrera quiero**
 
 Escribe el número de tu opción 📝`,
 
@@ -39,19 +40,22 @@ Escribe el número de tu opción 📝`,
 
   proceso_admision: `📋 **PROCESO DE ADMISIÓN UNIACC 2025**
 
-📅 **FECHAS IMPORTANTES:**
-• **Matrículas 2025:** Hasta 28 de Febrero
-• **Inicio de clases:** 10 de Marzo 2025
+🔥 **¡MATRÍCULAS ABIERTAS!**
+📅 **Hasta:** 28 de Febrero 2025
+📚 **Inicio clases:** 10 de Marzo 2025
 
-✅ **REQUISITOS GENERALES:**
+✅ **REQUISITOS COMPLETOS:**
 1️⃣ Licencia de Enseñanza Media
-2️⃣ PSU/PDT o Ranking de Notas
-3️⃣ Cédula de identidad
+2️⃣ Concentración de notas 
+3️⃣ Cédula de identidad (ambos lados)
+4️⃣ PSU/PDT (opcional, mejora ranking)
 
-💡 **PROCESO INDEPENDIENTE:** 
-¡No dependemos del DEMRE!
+💡 **PROCESO INDEPENDIENTE DEL DEMRE**
+• Postula cuando quieras
+• Proceso continuo
+• Respuesta rápida
 
-¿En qué paso necesitas ayuda?`,
+🚀 **¿LISTO PARA POSTULAR?**`,
 
   no_entendido: `❓ No estoy seguro de entender tu consulta.
 

@@ -348,6 +348,36 @@ app.post('/api/botpress-webhook', async (req, res) => {
   }
 })
 
+// Endpoint para consultar prospectos por WhatsApp (para reconocimiento de usuarios)
+app.get('/api/prospectos', async (req, res) => {
+  try {
+    const { supabase } = useSupabase()
+    const { whatsapp } = req.query
+    
+    if (!whatsapp) {
+      return res.status(400).json({ success: false, error: 'whatsapp parameter required' })
+    }
+    
+    // Obtener prospectos por WhatsApp ordenados por fecha
+    const { data: prospectos, error } = await supabase
+      .from('prospectos')
+      .select('id, nombre, email, carrera_interes, tipo_consulta, created_at, nivel_interes')
+      .eq('whatsapp', whatsapp)
+      .order('created_at', { ascending: false })
+      .limit(5) // Últimos 5 para historial
+    
+    if (error) {
+      console.error('❌ Error obteniendo prospectos por WhatsApp:', error)
+      return res.json({ success: false, error: error.message })
+    }
+
+    res.json({ success: true, data: prospectos || [] })
+  } catch (error) {
+    console.error('💥 Error en /api/prospectos:', error)
+    res.status(500).json({ success: false, error: 'Error interno' })
+  }
+})
+
 // API Endpoints missing
 app.get('/api/stats', async (req, res) => {
   try {

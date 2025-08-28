@@ -1,5 +1,7 @@
 # 🎓 UNIACC ChatBot - Sistema Completo de Captación de Prospectos
 
+**Autor:** Juan Pablo Silva feat Claude AI
+
 ## 📋 Descripción
 
 Sistema completo de chatbot conversacional para UNIACC con arquitectura de microservicios:
@@ -59,7 +61,12 @@ npm install
 cd chatbot
 npm run dev
 
-# Terminal 2: Dashboard API Server (Puerto 3002)
+# Terminal 2: Dashboard completo (Frontend + API) (Puerto 3000 y 3002)
+cd dashboard
+npm run dev:full
+
+# Comando alternativo para desarrollo separado:
+# Terminal 2a: Dashboard API Server (Puerto 3002)
 cd dashboard
 npm run dev:server
 
@@ -83,34 +90,43 @@ npm run dev
   - Información de proceso de admisión 2025
   - Costos, becas y beneficios
   - Modalidades de estudio (presencial, online, híbrida)
-  - Conexión con asesor humano
-- ✅ **Gestión de estado por usuario**
+  - Conexión con asesor humano (nivel urgente)
+- ✅ **Gestión de estado por usuario con reset automático**
 - ✅ **Integración con Supabase**
-- ✅ **Validación de datos (email, teléfono)**
+- ✅ **Validación de datos (email, teléfono, edad, región)**
 - ✅ **Interfaz web de testing**
 - ✅ **Webhooks para WhatsApp Business API**
+- ✅ **Sistema anti-duplicados por flujo**
+- ✅ **Reinicio automático de conversación**
 
 ### 📊 Dashboard Frontend (Puerto 3000)
 - ✅ **Gestión de prospectos en tiempo real**
 - ✅ **Lista de conversaciones activas**
 - ✅ **Interfaz de chat para ejecutivos**
 - ✅ **Métricas y estadísticas**
+- ✅ **Identificación visual de prospectos urgentes**
+- ✅ **Filtros por tipo de consulta y nivel de interés**
 - ✅ **Responsive design**
 - ✅ **TypeScript con tipado fuerte**
 
 ### 🔌 Dashboard API Server (Puerto 3002)
 - ✅ **API REST completa**
 - ✅ **Integración directa con Supabase**
-- ✅ **Función RPC para upsert de prospectos**
+- ✅ **Mapeo automático de tipos de consulta**
+- ✅ **Gestión de niveles de interés (incluye 'urgente')**
 - ✅ **Gestión de conversaciones y mensajes**
 - ✅ **CORS configurado**
-- ✅ **Validación de datos**
+- ✅ **Validación de datos y constraints**
+- ✅ **Webhook para recepción de prospectos**
 
 ### 🗄️ Base de Datos (Supabase)
 - ✅ **Tabla de prospectos con campos completos**
 - ✅ **Tabla de conversaciones**
 - ✅ **Tabla de mensajes**
-- ✅ **Función RPC para evitar duplicados**
+- ✅ **Función RPC para upsert de prospectos**
+- ✅ **Constraints actualizados (fuente y nivel_interes)**
+- ✅ **Índices para prospectos urgentes**
+- ✅ **Triggers automáticos**
 - ✅ **Timestamps automáticos**
 
 ## 🔗 Endpoints API
@@ -124,9 +140,9 @@ npm run dev
 - `GET /stats` - Estadísticas del bot
 
 ### Dashboard API Server (Puerto 3002)
-- `POST /api/prospectos` - **Crear/actualizar prospecto**
-- `GET /api/prospectos` - Listar prospectos
 - `POST /api/interacciones` - **Registrar interacciones del bot**
+- `POST /api/botpress-webhook` - **Webhook de Botpress para prospectos**
+- `GET /api/prospectos` - Listar prospectos
 - `GET /api/conversaciones` - **Listar conversaciones**
 - `GET /api/conversaciones/:id/mensajes` - **Mensajes de conversación**
 - `GET /api/stats` - **Estadísticas generales**
@@ -143,8 +159,11 @@ npm run dev
 - [x] **Interfaz web de testing** completamente funcional
 - [x] **Documentación técnica** completa (arquitectura.md)
 - [x] **Gestión de estado** avanzada por usuario
-- [x] **Función RPC personalizada** para evitar duplicados
-- [x] **Variables de entorno** configuradas para todos los servicios
+- [x] **Sistema anti-duplicados** - 1 prospecto por flujo completado
+- [x] **Reinicio automático** de conversación post-flujo
+- [x] **Niveles de prioridad** (urgente para solicitudes de asesor)
+- [x] **Mapeo automático** de tipos de consulta
+- [x] **Constraints de BD** actualizados y funcionales
 
 ### 🔄 Próximas Fases
 - [ ] **Integración real** con WhatsApp Business API
@@ -178,15 +197,19 @@ cd ../dashboard && npm install
 # chatbot/.env
 SUPABASE_URL=tu_url_supabase
 SUPABASE_ANON_KEY=tu_anon_key
-VUE_WEBHOOK_URL=http://localhost:3002/api/prospectos
+VUE_WEBHOOK_URL=http://localhost:3002/api/botpress-webhook
 
 # dashboard/.env (para API Server)
 VITE_SUPABASE_URL=tu_url_supabase
 VITE_SUPABASE_ANON_KEY=tu_anon_key
 ```
 
-### 4. **Levantar servicios (3 terminales):**
+### 4. **Levantar servicios:**
 ```bash
+# Opción 1: Todo en uno (recomendado)
+cd dashboard && npm run dev:full
+
+# Opción 2: Por separado (3 terminales)
 # Terminal 1: ChatBot Backend
 cd chatbot && npm run dev
 
@@ -218,17 +241,30 @@ cd dashboard && npm run dev
 2️⃣ Proceso de admisión 2025  
 3️⃣ Costos y becas
 4️⃣ Modalidades de estudio
-5️⃣ Hablar con un asesor
+5️⃣ Hablar con un asesor (URGENTE)
 ```
 
 ### 📋 **Proceso de Captura de Prospectos**
 ```
 1. Saludo inicial → Solicita nombre
 2. Solicita email (con validación)
-3. Solicita edad y región
-4. Solicita teléfono
-5. Guarda en Supabase → Menú principal
+3. Solicita edad (validación numérica) y región (menú)
+4. Solicita teléfono (validación longitud)
+5. Muestra menú principal
+6. Al completar flujo → Guarda prospecto + Reset usuario
 ```
+
+### 🔄 **Sistema Anti-Duplicados**
+- **1 prospecto por flujo completado**
+- **Reset automático** del usuario post-guardado
+- **Mensaje de reinicio:** "Escribe 'Hola' para comenzar con una nueva consulta"
+
+### 🚨 **Clasificación de Prospectos**
+- **Consulta General** (`alto`) - Flujos informativos
+- **Costos y Becas** (`alto`) - Interés en financiamiento
+- **Modalidades de Estudio** (`alto`) - Interés en formatos
+- **Solicitud de Asesor** (`urgente`) - Requiere atención inmediata
+- **Exploración de Carreras** (`alto`) - Interés académico específico
 
 ### 🎓 **Exploración de Carreras por Facultad**
 - **A) Artes:** Teatro, Danza, Música, Artes Visuales
@@ -260,14 +296,17 @@ cd dashboard && npm run dev
 
 ### **Base de Datos**
 - **Supabase PostgreSQL**
-- **Tablas:** prospectos, conversaciones, mensajes
+- **Tablas:** prospectos, conversaciones, mensajes, ejecutivos, automatizaciones
 - **RPC:** upsert_prospecto_por_whatsapp
+- **Constraints:** fuente_check, nivel_interes_check, tipo_consulta
+- **Índices:** prospectos_urgentes, tipo_consulta
 - **Real-time** subscriptions ready
 
 ### **Arquitectura**
 - **Microservicios** independientes
 - **API REST** para comunicación
 - **Estado distribuido** por servicio
+- **Anti-patrones** de duplicación implementados
 
 ## 📚 Documentación Completa
 
@@ -309,6 +348,9 @@ npm run build
 |---------|--------|
 | **Flujos conversacionales** | ✅ 5 flujos completos |
 | **Captura de prospectos** | ✅ 100% funcional |
+| **Sistema anti-duplicados** | ✅ Implementado |
+| **Clasificación de urgencia** | ✅ Prospectos urgentes |
+| **Reinicio automático** | ✅ Reset post-flujo |
 | **Integración BD** | ✅ Supabase operativa |
 | **API Endpoints** | ✅ 12 endpoints activos |
 | **Frontend responsivo** | ✅ Desktop + Mobile |
@@ -316,3 +358,7 @@ npm run build
 
 **🎯 MVP Completado:** Agosto 2025  
 **📈 Próximo hito:** Integración WhatsApp Business API real
+
+---
+
+**Desarrollado con ❤️ por Juan Pablo Silva feat Claude AI**

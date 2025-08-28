@@ -18,6 +18,11 @@ export interface UsuarioState {
   }
   facultad_seleccionada?: string
   carrera_seleccionada?: string
+  carreras_sugeridas?: any[]
+  historial_consultas?: string[]
+  ultima_carrera_consultada?: string
+  es_usuario_recurrente?: boolean
+  fecha_ultima_interaccion?: Date
   intentos_captura: number
 }
 
@@ -87,20 +92,41 @@ export class UniaccBot {
       case 'proceso_admision':
         return await this.procesarProcesoAdmision(userId, textoLimpio)
       
+      case 'busqueda_directa_carrera':
+        return await this.procesarBusquedaDirectaCarrera(userId, textoLimpio)
+      
+      case 'costos_becas_decision':
+        return await this.procesarCostosBecasDecision(userId, textoLimpio)
+      
+      case 'modalidades_decision':
+        return await this.procesarModalidadesDecision(userId, textoLimpio)
+      
+      case 'menu_contextual':
+        return await this.procesarMenuContextual(userId, textoLimpio)
+      
       default:
         return this.manejarNoEntendido(userId)
     }
   }
 
-  private iniciarConversacion(userId: string): string {
-    this.resetUsuario(userId)
-    this.setUsuarioState(userId, {
-      flujo_actual: 'captura_inicial',
-      paso_actual: 'solicitar_nombre'
-    })
-    return `🎓 ¡Hola! Para brindarte información personalizada sobre UNIACC:
+  private async iniciarConversacion(userId: string): Promise<string> {
+    // Verificar si es usuario recurrente
+    const usuarioExistente = await this.verificarUsuarioExistente(userId)
+    
+    if (usuarioExistente) {
+      // Usuario recurrente - mostrar menú contextual
+      return this.mostrarMenuContextual(userId, usuarioExistente)
+    } else {
+      // Usuario nuevo - flujo normal
+      this.resetUsuario(userId)
+      this.setUsuarioState(userId, {
+        flujo_actual: 'captura_inicial',
+        paso_actual: 'solicitar_nombre'
+      })
+      return `🎓 ¡Hola! Para brindarte información personalizada sobre UNIACC:
 
 👤 ¿Cuál es tu **nombre completo**?`
+    }
   }
 
   private async procesarCapturaInicial(userId: string, mensaje: string): Promise<string> {
@@ -286,6 +312,19 @@ Escribe el número de tu opción 📝`
       }
     }
 
+    if (mensaje.includes('6') || mensaje.includes('ya se') || mensaje.includes('ya sé')) {
+      this.setUsuarioState(userId, {
+        flujo_actual: 'busqueda_directa_carrera',
+        paso_actual: 'solicitar_carrera',
+        opcion_menu_seleccionada: 'busqueda_directa'
+      })
+      return `🚀 **¡Perfecto! Vamos directo al grano**
+
+🎓 **¿Cuál es la carrera que te interesa?**
+
+Escribe el nombre de la carrera que quieres estudiar (ejemplo: "Psicología", "Arquitectura", "Diseño", "Derecho", etc.):`
+    }
+
     return this.manejarNoEntendido(userId)
   }
 
@@ -348,11 +387,26 @@ Escribe el número de tu opción 📝`
   }
 
   private async procesarDetalleCarrera(userId: string, mensaje: string): Promise<string> {
-    if (mensaje.includes('mas') || mensaje.includes('información') || mensaje.includes('info')) {
-      return this.mostrarInformacionAdicional(userId)
+    // Solo procesar respuestas numéricas para mayor simplicidad
+    if (mensaje === '1') {
+      await this.guardarProspectoFinalFlujo(userId, 'exploracion_carreras')
+      return `¡Excelente elección! 🎓 Nos pondremos en contacto contigo pronto con más información sobre esta carrera.
+
+✨ **¡Gracias por tu consulta!**
+
+💬 **Escribe "Hola" para comenzar con una nueva consulta**`
     }
 
-    if (mensaje.includes('asesor') || mensaje.includes('contacto') || mensaje.includes('hablar')) {
+    if (mensaje === '2') {
+      await this.guardarProspectoFinalFlujo(userId, 'exploracion_carreras')
+      return `Entendido. 📚 Gracias por explorar nuestras opciones académicas.
+
+✨ **¡Gracias por tu consulta!**
+
+💬 **Escribe "Hola" para comenzar con una nueva consulta**`
+    }
+
+    if (mensaje === '3') {
       this.setUsuarioState(userId, {
         flujo_actual: 'captura_datos',
         paso_actual: 'nombre'
@@ -360,16 +414,22 @@ Escribe el número de tu opción 📝`
       return await this.iniciarCapturaDatos(userId)
     }
 
-    if (mensaje.includes('otra') || mensaje.includes('menu') || mensaje.includes('volver')) {
-      return this.iniciarConversacion(userId)
+    if (mensaje === '4') {
+      this.setUsuarioState(userId, {
+        flujo_actual: 'exploracion_carreras',
+        paso_actual: 'seleccion_facultad'
+      })
+      return RESPUESTAS.menu_facultades
     }
 
-    return `🤔 ¿Te interesa esta carrera?
+    return `**¿Qué te gustaría hacer?**
 
-💬 **Opciones:**
-• Escribe "más información" para detalles
-• Escribe "asesor" para hablar con alguien
-• Escribe "menú" para ver otras carreras`
+1️⃣ Me interesa, quiero más información
+2️⃣ No es para mí
+3️⃣ Hablar con un asesor
+4️⃣ Ver otra carrera
+
+**Escribe solo el número (1, 2, 3 o 4):**`
   }
 
   private async procesarCapturaDatos(userId: string, mensaje: string): Promise<string> {
@@ -390,43 +450,27 @@ Escribe el número de tu opción 📝`
         }
 
       case 'telefono':
-        this.setUsuarioState(userId, {
-          datos_prospecto: { ...state.datos_prospecto, telefono: mensaje },
-          paso_actual: 'confirmar_telefono'
-        })
-        return `📱 **Teléfono confirmado:** ${mensaje}
-
-📧 Ahora, ¿cuál es tu **email**?`
-
-      case 'confirmar_telefono':
+        // Validación básica de teléfono
+        const telefonoLimpio = mensaje.replace(/\s/g, '')
+        if (telefonoLimpio.length < 8) {
+          return `❌ Por favor ingresa un número de teléfono válido`
+        }
+        
         this.setUsuarioState(userId, {
           datos_prospecto: { ...state.datos_prospecto, telefono: mensaje },
           paso_actual: 'email'
         })
-        return `📱 **Teléfono confirmado:** ${mensaje}
+        return `📱 **Teléfono:** ${mensaje}
 
-📧 Ahora, ¿cuál es tu **email**?`
+📧 ¿Cuál es tu **email**?`
 
       case 'email':
         if (this.validarEmail(mensaje)) {
           this.setUsuarioState(userId, {
             datos_prospecto: { ...state.datos_prospecto, email: mensaje },
-            paso_actual: 'confirmar_email'
-          })
-          return `📧 **Email confirmado:** ${mensaje}
-
-🎓 ¿Qué **carrera te interesa**? (puedes escribir el nombre)`
-        } else {
-          return '📧 Email inválido. Ejemplo: juan@gmail.com'
-        }
-
-      case 'confirmar_email':
-        if (this.validarEmail(mensaje)) {
-          this.setUsuarioState(userId, {
-            datos_prospecto: { ...state.datos_prospecto, email: mensaje },
             paso_actual: 'carrera_interes'
           })
-          return `📧 **Email confirmado:** ${mensaje}
+          return `📧 **Email:** ${mensaje}
 
 🎓 ¿Qué **carrera te interesa**? (puedes escribir el nombre)`
         } else {
@@ -451,39 +495,19 @@ Escribe el número de tu opción 📝`
   }
 
   private async procesarProcesoAdmision(userId: string, mensaje: string): Promise<string> {
-    if (mensaje.includes('requisito')) {
-      return `📋 **REQUISITOS DE ADMISIÓN**
+    // Manejo simplificado con opciones numéricas directas
+    if (mensaje === '1') {
+      await this.guardarProspectoFinalFlujo(userId, 'proceso_admision')
+      return `¡Perfecto! 🎓 Ya tienes toda la información para postular.
 
-✅ **Documentos obligatorios:**
-1️⃣ Licencia de Enseñanza Media
-2️⃣ Concentración de notas
-3️⃣ Cédula de identidad (ambos lados)
-4️⃣ PSU/PDT (opcional, mejora tu ranking)
+🚀 **¡Comienza tu proceso cuando estés listo!**
 
-💡 **¿Sabías que?** UNIACC tiene proceso independiente
+✨ **¡Gracias por tu consulta!**
 
-¿Necesitas ayuda con algún documento específico?
-
-${this.mostrarMenuNavegacion()}`
+💬 **Escribe "Hola" para comenzar con una nueva consulta**`
     }
 
-    if (mensaje.includes('fecha') || mensaje.includes('plazo')) {
-      return `📅 **FECHAS IMPORTANTES ADMISIÓN 2025**
-
-🟢 **MATRÍCULAS ABIERTAS**
-• Hasta: 28 de Febrero 2025
-• Proceso continuo: ¡Postula cuando quieras!
-
-📚 **INICIO DE CLASES**
-• Fecha: 10 de Marzo 2025
-• Inducción: 3-7 de Marzo
-
-¿Te ayudo con el proceso de postulación?
-
-${this.mostrarMenuNavegacion()}`
-    }
-
-    if (mensaje.includes('asesor') || mensaje.includes('ayuda')) {
+    if (mensaje === '2') {
       this.setUsuarioState(userId, {
         flujo_actual: 'captura_datos',
         paso_actual: 'nombre'
@@ -491,8 +515,7 @@ ${this.mostrarMenuNavegacion()}`
       return await this.iniciarCapturaDatos(userId)
     }
 
-    // Manejar opciones del menú principal cuando está en proceso admisión
-    if (mensaje.includes('1') || mensaje.includes('carrera')) {
+    if (mensaje === '3') {
       this.setUsuarioState(userId, {
         flujo_actual: 'exploracion_carreras',
         paso_actual: 'seleccion_facultad'
@@ -500,15 +523,91 @@ ${this.mostrarMenuNavegacion()}`
       return RESPUESTAS.menu_facultades
     }
 
-    if (mensaje.includes('3') || mensaje.includes('costo') || mensaje.includes('beca')) {
-      return await this.mostrarCostosYBecas(userId)
+    // Si no entiende, mostrar opciones claras
+    return RESPUESTAS.proceso_admision + `\n\n**¿Qué quieres hacer ahora?**\n\n` +
+           `1️⃣ Ya tengo toda la info, ¡gracias!\n` +
+           `2️⃣ Hablar con un asesor\n` +
+           `3️⃣ Ver qué carreras hay\n\n` +
+           `**Escribe solo el número (1, 2 o 3):**`
+  }
+
+  private async procesarBusquedaDirectaCarrera(userId: string, mensaje: string): Promise<string> {
+    const state = this.getUsuarioState(userId)
+
+    if (state.paso_actual === 'solicitar_carrera') {
+      // Buscar la carrera en todas las facultades
+      const carreraEncontrada = this.buscarCarreraPorNombre(mensaje)
+      
+      if (carreraEncontrada) {
+        // Mostrar detalle de la carrera encontrada
+        this.setUsuarioState(userId, {
+          facultad_seleccionada: carreraEncontrada.facultadId,
+          carrera_seleccionada: carreraEncontrada.carrera.id,
+          flujo_actual: 'detalle_carrera',
+          paso_actual: 'mostrar_info'
+        })
+        
+        return `🎯 **¡Encontré tu carrera!**\n\n` + 
+               this.mostrarDetalleCarrera(carreraEncontrada.facultadId, carreraEncontrada.carrera.id)
+      } else {
+        // No se encontró la carrera exacta, mostrar opciones similares
+        const carrerasSimilares = this.buscarCarrerasSimilares(mensaje)
+        
+        if (carrerasSimilares.length > 0) {
+          let respuesta = `🔍 **No encontré exactamente "${mensaje}", pero estas carreras podrían interesarte:**\n\n`
+          
+          carrerasSimilares.forEach((item, index) => {
+            respuesta += `${index + 1}️⃣ **${item.carrera.nombre}**\n`
+            respuesta += `   └ ${item.facultad.nombre}\n\n`
+          })
+          
+          respuesta += `**Escribe el número de la carrera que te interesa (1-${carrerasSimilares.length}):**`
+          
+          this.setUsuarioState(userId, {
+            paso_actual: 'seleccionar_sugerencia',
+            carreras_sugeridas: carrerasSimilares
+          })
+          
+          return respuesta
+        } else {
+          return `❌ **No encontré "${mensaje}" en nuestras carreras**\n\n` +
+                 `🔄 **¿Qué te gustaría hacer?**\n\n` +
+                 `1️⃣ Ver todas las carreras por facultad\n` +
+                 `2️⃣ Hablar con un asesor\n` +
+                 `3️⃣ Intentar con otro nombre\n\n` +
+                 `**Escribe el número (1, 2 o 3):**`
+        }
+      }
     }
 
-    if (mensaje.includes('4') || mensaje.includes('modalidad')) {
-      return await this.mostrarModalidades(userId)
+    if (state.paso_actual === 'seleccionar_sugerencia') {
+      const numero = parseInt(mensaje)
+      const carrerasSugeridas = state.carreras_sugeridas
+      
+      if (numero && carrerasSugeridas && numero <= carrerasSugeridas.length && numero > 0) {
+        const carreraSeleccionada = carrerasSugeridas[numero - 1]
+        
+        this.setUsuarioState(userId, {
+          facultad_seleccionada: carreraSeleccionada.facultadId,
+          carrera_seleccionada: carreraSeleccionada.carrera.id,
+          flujo_actual: 'detalle_carrera',
+          paso_actual: 'mostrar_info'
+        })
+        
+        return this.mostrarDetalleCarrera(carreraSeleccionada.facultadId, carreraSeleccionada.carrera.id)
+      }
     }
 
-    if (mensaje.includes('5') || mensaje.includes('asesor') || mensaje.includes('humano')) {
+    // Manejar opciones cuando no se encuentra la carrera
+    if (mensaje === '1') {
+      this.setUsuarioState(userId, {
+        flujo_actual: 'exploracion_carreras',
+        paso_actual: 'seleccion_facultad'
+      })
+      return RESPUESTAS.menu_facultades
+    }
+
+    if (mensaje === '2') {
       this.setUsuarioState(userId, {
         flujo_actual: 'captura_datos',
         paso_actual: 'nombre'
@@ -516,8 +615,304 @@ ${this.mostrarMenuNavegacion()}`
       return await this.iniciarCapturaDatos(userId)
     }
 
-    // Si no entiende, mostrar el proceso de admisión con menú
-    return RESPUESTAS.proceso_admision + "\n\n" + this.mostrarMenuNavegacion()
+    if (mensaje === '3') {
+      return `🎯 **Intentemos de nuevo**\n\n` +
+             `🎓 **¿Cuál es la carrera que te interesa?**\n\n` +
+             `Escribe el nombre de la carrera (ejemplo: "Psicología", "Arquitectura", "Diseño"):`
+    }
+
+    return `🤔 **No entendí tu respuesta**\n\n` +
+           `Por favor escribe el número de una de las opciones mostradas.`
+  }
+
+  private async procesarCostosBecasDecision(userId: string, mensaje: string): Promise<string> {
+    if (mensaje === '1') {
+      await this.guardarProspectoFinalFlujo(userId, 'costos_becas')
+      return `¡Perfecto! 💰 Esperamos que la información sobre costos y becas te haya sido útil.\n\n✨ **¡Gracias por tu consulta!**\n\n💬 **Escribe "Hola" para comenzar con una nueva consulta**`
+    }
+
+    if (mensaje === '2') {
+      this.setUsuarioState(userId, {
+        flujo_actual: 'captura_datos',
+        paso_actual: 'nombre'
+      })
+      return await this.iniciarCapturaDatos(userId)
+    }
+
+    if (mensaje === '3') {
+      this.setUsuarioState(userId, {
+        flujo_actual: 'exploracion_carreras',
+        paso_actual: 'seleccion_facultad'
+      })
+      return RESPUESTAS.menu_facultades
+    }
+
+    if (mensaje === '4') {
+      await this.guardarProspectoFinalFlujo(userId, 'costos_becas')
+      return `¡Excelente! 💰 Nos da mucho gusto haberte ayudado.\n\n✨ **¡Gracias por tu consulta!**\n\n💬 **Escribe "Hola" para comenzar con una nueva consulta**`
+    }
+
+    return `**Elige una opción:**\n\n1️⃣ Sí, quiero más información\n2️⃣ Hablar con un asesor sobre becas\n3️⃣ Ver qué carreras hay\n4️⃣ Ya tengo la info que necesitaba\n\n**Escribe solo el número (1, 2, 3 o 4):**`
+  }
+
+  private async procesarModalidadesDecision(userId: string, mensaje: string): Promise<string> {
+    if (mensaje === '1') {
+      await this.guardarProspectoFinalFlujo(userId, 'modalidades_estudio')
+      return `¡Perfecto! 🏢 La modalidad presencial es ideal para networking y máxima interacción.\n\n✨ **¡Gracias por tu consulta!**\n\n💬 **Escribe "Hola" para comenzar con una nueva consulta**`
+    }
+
+    if (mensaje === '2') {
+      await this.guardarProspectoFinalFlujo(userId, 'modalidades_estudio')
+      return `¡Excelente elección! 💻 La modalidad semipresencial te da la flexibilidad que necesitas.\n\n✨ **¡Gracias por tu consulta!**\n\n💬 **Escribe "Hola" para comenzar con una nueva consulta**`
+    }
+
+    if (mensaje === '3') {
+      this.setUsuarioState(userId, {
+        flujo_actual: 'captura_datos',
+        paso_actual: 'nombre'
+      })
+      return await this.iniciarCapturaDatos(userId)
+    }
+
+    if (mensaje === '4') {
+      await this.guardarProspectoFinalFlujo(userId, 'modalidades_estudio')
+      return `¡Genial! 🎆 Esperamos que la información sobre modalidades te haya sido útil.\n\n✨ **¡Gracias por tu consulta!**\n\n💬 **Escribe "Hola" para comenzar con una nueva consulta**`
+    }
+
+    return `**Elige una modalidad:**\n\n1️⃣ Presencial - Máxima interacción\n2️⃣ Semipresencial - Flexibilidad\n3️⃣ Hablar con un asesor\n4️⃣ Ya tengo la info que necesitaba\n\n**Escribe solo el número (1, 2, 3 o 4):**`
+  }
+
+  private async verificarUsuarioExistente(userId: string): Promise<any | null> {
+    try {
+      // Buscar usuario en base de datos por WhatsApp
+      const response = await fetch(`http://localhost:3002/api/prospectos?whatsapp=${userId}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      })
+      
+      if (!response.ok) {
+        return null
+      }
+      
+      const data = await response.json() as any
+      if (!data.success || !data.data || data.data.length === 0) {
+        return null
+      }
+      
+      const usuario = data.data[0] // Último prospecto
+      
+      // Verificar que no sea muy antigua (más de 30 días)
+      const fechaConsulta = new Date(usuario.created_at)
+      const ahora = new Date()
+      const diasDiferencia = (ahora.getTime() - fechaConsulta.getTime()) / (1000 * 60 * 60 * 24)
+      
+      if (diasDiferencia > 30) {
+        return null // Muy antigua, tratar como nuevo usuario
+      }
+      
+      return usuario
+      
+    } catch (error) {
+      console.error('⚠️ Error verificando usuario existente:', error)
+      return null
+    }
+  }
+
+  private mostrarMenuContextual(userId: string, usuario: any): string {
+    // Cargar datos en estado para uso posterior
+    this.setUsuarioState(userId, {
+      datos_prospecto: {
+        nombre: usuario.nombre,
+        email: usuario.email,
+        carrera_interes: usuario.carrera_interes
+      },
+      es_usuario_recurrente: true,
+      ultima_carrera_consultada: usuario.carrera_interes,
+      flujo_actual: 'menu_contextual',
+      paso_actual: 'opciones_recurrente'
+    })
+
+    const nombreUsuario = usuario.nombre || 'amigo'
+    const tiempoSaludo = this.obtenerSaludoTiempo()
+    
+    let mensaje = `🎓 ¡${tiempoSaludo} ${nombreUsuario}! Te reconozco.\n\n`
+    
+    // Personalizar según última consulta
+    if (usuario.tipo_consulta === 'solicitud de asesor') {
+      mensaje += `👤 **Estado:** Un asesor se pondrá en contacto contigo pronto.\n\n`
+    } else if (usuario.carrera_interes && usuario.carrera_interes !== 'Sin especificar') {
+      mensaje += `📚 **Última consulta:** ${usuario.carrera_interes}\n\n`
+    }
+    
+    mensaje += `🌟 **¿En qué puedo ayudarte hoy?**\n\n`
+    
+    // Menú contextual basado en historial
+    if (usuario.carrera_interes && usuario.carrera_interes !== 'Sin especificar') {
+      mensaje += `1️⃣ Más info sobre **${usuario.carrera_interes}**\n`
+      mensaje += `2️⃣ Ver carreras similares\n`
+      mensaje += `3️⃣ Proceso de admisión\n`
+      mensaje += `4️⃣ Costos y becas\n`
+      mensaje += `5️⃣ Hablar con un asesor\n`
+      mensaje += `6️⃣ Consulta completamente nueva\n\n`
+    } else {
+      // Menú general mejorado
+      mensaje += `1️⃣ Explorar carreras\n`
+      mensaje += `2️⃣ Proceso de admisión 2025\n`
+      mensaje += `3️⃣ Costos y becas\n`
+      mensaje += `4️⃣ Modalidades de estudio\n`
+      mensaje += `5️⃣ Hablar con un asesor\n`
+      mensaje += `6️⃣ Búsqueda directa de carrera\n\n`
+    }
+    
+    mensaje += `**Escribe el número de tu opción 📝**`
+    
+    return mensaje
+  }
+
+  private obtenerSaludoTiempo(): string {
+    const hora = new Date().getHours()
+    if (hora < 12) return 'Buenos días'
+    if (hora < 18) return 'Buenas tardes'
+    return 'Buenas noches'
+  }
+
+  private async procesarMenuContextual(userId: string, mensaje: string): Promise<string> {
+    const state = this.getUsuarioState(userId)
+    
+    if (mensaje === '6') {
+      // Consulta completamente nueva - reiniciar
+      this.resetUsuario(userId)
+      this.setUsuarioState(userId, {
+        flujo_actual: 'captura_inicial',
+        paso_actual: 'solicitar_nombre'
+      })
+      return `🎓 ¡Perfecto! Empecemos de nuevo.\n\n👤 ¿Cuál es tu **nombre completo**?`
+    }
+    
+    // Para usuarios con historial de carrera específica
+    if (state.ultima_carrera_consultada) {
+      if (mensaje === '1') {
+        // Más info sobre carrera anterior
+        const carrera = this.buscarCarreraPorNombre(state.ultima_carrera_consultada)
+        if (carrera) {
+          this.setUsuarioState(userId, {
+            facultad_seleccionada: carrera.facultadId,
+            carrera_seleccionada: carrera.carrera.id,
+            flujo_actual: 'detalle_carrera',
+            paso_actual: 'mostrar_info'
+          })
+          return this.mostrarDetalleCarrera(carrera.facultadId, carrera.carrera.id)
+        }
+      }
+      
+      if (mensaje === '2') {
+        // Ver carreras similares
+        const similares = this.buscarCarrerasSimilares(state.ultima_carrera_consultada)
+        if (similares.length > 0) {
+          let respuesta = `🔍 **Carreras similares a ${state.ultima_carrera_consultada}:**\n\n`
+          
+          similares.forEach((item, index) => {
+            respuesta += `${index + 1}️⃣ **${item.carrera.nombre}**\n`
+            respuesta += `   └ ${item.facultad.nombre}\n\n`
+          })
+          
+          respuesta += `**Escribe el número de la carrera que te interesa:**`
+          
+          this.setUsuarioState(userId, {
+            flujo_actual: 'busqueda_directa_carrera',
+            paso_actual: 'seleccionar_sugerencia',
+            carreras_sugeridas: similares
+          })
+          
+          return respuesta
+        }
+      }
+      
+      if (mensaje === '3') {
+        this.setUsuarioState(userId, {
+          flujo_actual: 'proceso_admision',
+          paso_actual: 'info_general',
+          opcion_menu_seleccionada: 'proceso_admision'
+        })
+        return RESPUESTAS.proceso_admision
+      }
+      
+      if (mensaje === '4') {
+        this.setUsuarioState(userId, {
+          opcion_menu_seleccionada: 'costos_becas'
+        })
+        return await this.mostrarCostosYBecas(userId)
+      }
+      
+      if (mensaje === '5') {
+        this.setUsuarioState(userId, {
+          opcion_menu_seleccionada: 'hablar_asesor'
+        })
+        return await this.iniciarCapturaDatos(userId)
+      }
+    } else {
+      // Menú general para usuarios sin carrera específica
+      // Procesar opciones 1-6 del menú contextual general
+      if (mensaje === '1') {
+        this.setUsuarioState(userId, {
+          flujo_actual: 'exploracion_carreras',
+          paso_actual: 'seleccion_facultad',
+          opcion_menu_seleccionada: 'conocer_carreras'
+        })
+        return RESPUESTAS.menu_facultades
+      }
+      
+      if (mensaje === '2') {
+        this.setUsuarioState(userId, {
+          flujo_actual: 'proceso_admision',
+          paso_actual: 'info_general',
+          opcion_menu_seleccionada: 'proceso_admision'
+        })
+        return RESPUESTAS.proceso_admision
+      }
+      
+      if (mensaje === '3') {
+        this.setUsuarioState(userId, {
+          opcion_menu_seleccionada: 'costos_becas'
+        })
+        return await this.mostrarCostosYBecas(userId)
+      }
+      
+      if (mensaje === '4') {
+        this.setUsuarioState(userId, {
+          opcion_menu_seleccionada: 'modalidades_estudio'
+        })
+        return await this.mostrarModalidades(userId)
+      }
+      
+      if (mensaje === '5') {
+        this.setUsuarioState(userId, {
+          opcion_menu_seleccionada: 'hablar_asesor'
+        })
+        return await this.iniciarCapturaDatos(userId)
+      }
+      
+      if (mensaje === '6') {
+        this.setUsuarioState(userId, {
+          flujo_actual: 'busqueda_directa_carrera',
+          paso_actual: 'solicitar_carrera',
+          opcion_menu_seleccionada: 'busqueda_directa'
+        })
+        return `🚀 **¡Perfecto! Vamos directo al grano**
+
+🎓 **¿Cuál es la carrera que te interesa?**
+
+Escribe el nombre de la carrera que quieres estudiar (ejemplo: "Psicología", "Arquitectura", "Diseño", "Derecho", etc.):`
+      }
+    }
+    
+    // Si no entiende la opción, mostrar menú nuevamente
+    return this.mostrarMenuContextual(userId, {
+      nombre: state.datos_prospecto.nombre,
+      carrera_interes: state.ultima_carrera_consultada
+    })
   }
 
   // Métodos auxiliares
@@ -558,10 +953,12 @@ ${this.mostrarMenuNavegacion()}`
       mensaje += `\n`
     }
 
-    mensaje += `💬 **¿Te interesa?**\n`
-    mensaje += `• Escribe "asesor" para hablar con alguien\n`
-    mensaje += `• Escribe "más información"\n`
-    mensaje += `• Escribe "menú" para ver otras carreras`
+    mensaje += `**¿Qué te gustaría hacer?**\n\n`
+    mensaje += `1️⃣ Me interesa, quiero más información\n`
+    mensaje += `2️⃣ No es para mí\n`
+    mensaje += `3️⃣ Hablar con un asesor\n`
+    mensaje += `4️⃣ Ver otra carrera\n\n`
+    mensaje += `**Escribe solo el número (1, 2, 3 o 4):**`
 
     return mensaje
   }
@@ -582,18 +979,17 @@ ${this.mostrarMenuNavegacion()}`
       mensaje += `└ Descuento: ${beca.descuento}\n\n`
     })
 
-    mensaje += `¿Quieres saber sobre becas para una carrera específica?\n\n`
-    
-    mensaje += `✨ **¡Gracias por tu consulta!**\n\n`
-    mensaje += `💬 **Escribe "Hola" para comenzar con una nueva consulta**`
+    mensaje += `**¿Te interesan nuestros costos y becas?**\n\n`
+    mensaje += `1️⃣ Sí, quiero más información\n`
+    mensaje += `2️⃣ Hablar con un asesor sobre becas\n`
+    mensaje += `3️⃣ Ver qué carreras hay\n`
+    mensaje += `4️⃣ Ya tengo la info que necesitaba\n\n`
+    mensaje += `**Escribe solo el número (1, 2, 3 o 4):**`
     
     this.setUsuarioState(userId, {
-      flujo_actual: 'menu_principal',
-      paso_actual: 'post_becas'
+      flujo_actual: 'costos_becas_decision',
+      paso_actual: 'opciones'
     })
-
-    // Guardar prospecto al finalizar consulta de becas
-    await this.guardarProspectoFinalFlujo(userId, 'costos_becas')
 
     return mensaje
   }
@@ -615,18 +1011,17 @@ ${this.mostrarMenuNavegacion()}`
     mensaje += `• Total flexibilidad horaria\n`
     mensaje += `• Mismo título universitario\n\n`
 
-    mensaje += `¿Qué modalidad te conviene más?\n\n`
-
-    mensaje += `✨ **¡Gracias por tu consulta!**\n\n`
-    mensaje += `💬 **Escribe "Hola" para comenzar con una nueva consulta**`
+    mensaje += `**¿Qué modalidad te interesa más?**\n\n`
+    mensaje += `1️⃣ Presencial - Máxima interacción\n`
+    mensaje += `2️⃣ Semipresencial - Flexibilidad\n`
+    mensaje += `3️⃣ Hablar con un asesor\n`
+    mensaje += `4️⃣ Ya tengo la info que necesitaba\n\n`
+    mensaje += `**Escribe solo el número (1, 2, 3 o 4):**`
 
     this.setUsuarioState(userId, {
-      flujo_actual: 'menu_principal',
-      paso_actual: 'post_modalidades'
+      flujo_actual: 'modalidades_decision',
+      paso_actual: 'opciones'
     })
-
-    // Guardar prospecto al finalizar consulta de modalidades
-    await this.guardarProspectoFinalFlujo(userId, 'modalidades_estudio')
 
     return mensaje
   }
@@ -749,7 +1144,8 @@ Un asesor especializado te contactará para:
         ...datos,
         whatsapp: userId,
         carrera_interes: state.carrera_seleccionada || datos.carrera_interes,
-        facultad_interes: state.facultad_seleccionada
+        facultad_interes: state.facultad_seleccionada,
+        region: datos.region
       })
 
       if (resultado.success) {
@@ -762,7 +1158,8 @@ Un asesor especializado te contactará para:
             ...datos,
             whatsapp: userId,
             carrera_interes: state.carrera_seleccionada || datos.carrera_interes,
-            facultad_interes: state.facultad_seleccionada
+            facultad_interes: state.facultad_seleccionada,
+            region: datos.region
           })
         }
       }
@@ -774,7 +1171,8 @@ Un asesor especializado te contactará para:
           ...datos,
           whatsapp: userId,
           carrera_interes: state.carrera_seleccionada || datos.carrera_interes,
-          facultad_interes: state.facultad_seleccionada
+          facultad_interes: state.facultad_seleccionada,
+          region: datos.region
         })
       }
     }
@@ -861,6 +1259,65 @@ Metro Salvador (Línea 1)
     return null
   }
 
+  private buscarCarreraPorNombre(nombreCarrera: string): { facultadId: string; carrera: any } | null {
+    const carreraLimpia = nombreCarrera.toLowerCase().trim()
+    
+    // Buscar en todas las facultades
+    for (const facultadId of Object.keys(FACULTADES_UNIACC)) {
+      const facultad = FACULTADES_UNIACC[facultadId]
+      
+      // Buscar si alguna carrera coincide exactamente
+      const carreraEncontrada = facultad.carreras.find(carrera => 
+        carrera.nombre.toLowerCase() === carreraLimpia ||
+        carrera.nombre.toLowerCase().includes(carreraLimpia) ||
+        carreraLimpia.includes(carrera.nombre.toLowerCase()) ||
+        carrera.id.toLowerCase() === carreraLimpia
+      )
+      
+      if (carreraEncontrada) {
+        return {
+          facultadId,
+          carrera: carreraEncontrada
+        }
+      }
+    }
+    
+    return null
+  }
+
+  private buscarCarrerasSimilares(nombreCarrera: string): { facultadId: string; facultad: any; carrera: any }[] {
+    const carreraLimpia = nombreCarrera.toLowerCase().trim()
+    const resultados: { facultadId: string; facultad: any; carrera: any }[] = []
+    
+    // Buscar en todas las facultades
+    for (const facultadId of Object.keys(FACULTADES_UNIACC)) {
+      const facultad = FACULTADES_UNIACC[facultadId]
+      
+      // Buscar carreras que contengan alguna palabra del término buscado
+      const palabrasBusqueda = carreraLimpia.split(' ')
+      
+      facultad.carreras.forEach(carrera => {
+        const nombreCarreraLimpio = carrera.nombre.toLowerCase()
+        
+        // Verificar si alguna palabra del término buscado está en el nombre de la carrera
+        const tieneCoincidencia = palabrasBusqueda.some(palabra => 
+          nombreCarreraLimpio.includes(palabra) && palabra.length > 2
+        )
+        
+        if (tieneCoincidencia) {
+          resultados.push({
+            facultadId,
+            facultad,
+            carrera
+          })
+        }
+      })
+    }
+    
+    // Limitar a máximo 5 resultados y eliminar duplicados
+    return resultados.slice(0, 5)
+  }
+
   private mostrarMenuNavegacion(): string {
     return `📱 **¿QUÉ MÁS QUIERES SABER?**
 
@@ -899,6 +1356,26 @@ Escribe el número de tu opción 📝`
     }
 
     try {
+      // Obtener nombres legibles para facultad y carrera
+      let facultadNombre = 'Sin especificar'
+      let carreraNombre = 'Sin especificar'
+      
+      if (state.facultad_seleccionada) {
+        const facultad = getFacultadById(state.facultad_seleccionada)
+        if (facultad) {
+          facultadNombre = facultad.nombre
+        }
+      }
+      
+      if (state.carrera_seleccionada && state.facultad_seleccionada) {
+        const carrera = getCarreraById(state.facultad_seleccionada, state.carrera_seleccionada)
+        if (carrera) {
+          carreraNombre = carrera.nombre
+        }
+      } else if (datos.carrera_interes) {
+        carreraNombre = datos.carrera_interes
+      }
+
       const prospectoData: ProspectoData = {
         nombre: datos.nombre,
         email: datos.email,
@@ -906,13 +1383,15 @@ Escribe el número de tu opción 📝`
         whatsapp: userId,
         edad: datos.edad,
         region: datos.region,
-        carrera_interes: state.carrera_seleccionada || datos.carrera_interes || 'Sin especificar',
-        facultad_interes: state.facultad_seleccionada || 'Sin especificar',
+        carrera_interes: carreraNombre,
+        facultad_interes: facultadNombre,
         source: 'uniacc_chatbot',
         flujo_actual: tipoConsulta
       }
 
       console.log(`💾 Guardando prospecto al finalizar flujo ${tipoConsulta}:`, datos.nombre)
+      console.log('🔍 DEBUG - Datos del estado completo:', JSON.stringify(state, null, 2))
+      console.log('🔍 DEBUG - ProspectoData a enviar:', JSON.stringify(prospectoData, null, 2))
       const resultado = await this.supabaseIntegration.enviarProspecto(prospectoData)
       
       if (resultado.success) {

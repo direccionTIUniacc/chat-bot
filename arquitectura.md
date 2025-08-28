@@ -19,11 +19,12 @@
 ## 🎯 Visión General
 
 El sistema ChatBot UNIACC está diseñado como una arquitectura de microservicios que permite:
+- **🆕 Progressive Capture System** - Zero data loss con captura incremental campo por campo
 - **Captura automática de prospectos** a través de WhatsApp con sistema anti-duplicados
-- **Gestión centralizada** de conversaciones y prospectos con clasificación de prioridad
-- **Dashboard en tiempo real** para seguimiento de leads con prospectos urgentes
+- **Gestión centralizada** de conversaciones y prospectos con clasificación granular de abandono
+- **Dashboard en tiempo real** para seguimiento de leads con análisis de abandono progresivo
 - **Integración con Supabase** para persistencia de datos con constraints avanzados
-- **Sistema de reinicio automático** de conversaciones post-flujo
+- **Sistema de timeout inteligente** que preserva datos parciales
 
 ```mermaid
 graph TB
@@ -103,23 +104,41 @@ chatbot/
 - **Integración WhatsApp:** Procesamiento de mensajes entrantes
 - **Persistencia:** Guardado de prospectos en Supabase con mapeo de tipos
 
-#### 🔄 Flujo de Conversación
+#### 🔄 Flujo de Conversación con Progressive Capture
 ```mermaid
 stateDiagram-v2
     [*] --> captura_inicial
-    captura_inicial --> menu_principal: Datos completos
+    captura_inicial --> solicitar_nombre: Inicio captura
+    solicitar_nombre --> crear_prospecto: Nombre ingresado
+    crear_prospecto --> solicitar_email: DB: abandono solo nombre
+    solicitar_email --> actualizar_email: Email ingresado
+    actualizar_email --> solicitar_edad: DB: abandono con email
+    solicitar_edad --> actualizar_edad: Edad ingresada
+    actualizar_edad --> solicitar_region: DB: abandono con edad
+    solicitar_region --> actualizar_region: Región ingresada
+    actualizar_region --> solicitar_telefono: DB: abandono con region
+    solicitar_telefono --> finalizar_captura: Teléfono ingresado
+    finalizar_captura --> menu_principal: DB: captura completa
+    
     menu_principal --> exploracion_carreras: Opción 1
     menu_principal --> proceso_admision: Opción 2
     menu_principal --> costos_becas: Opción 3
     menu_principal --> modalidades: Opción 4
     menu_principal --> hablar_asesor: Opción 5 (URGENTE)
+    
     exploracion_carreras --> guardado_prospecto: Fin flujo
     proceso_admision --> guardado_prospecto: Fin flujo
     costos_becas --> guardado_prospecto: Fin flujo
     modalidades --> guardado_prospecto: Fin flujo
     hablar_asesor --> guardado_prospecto: Fin flujo
+    
     guardado_prospecto --> reset_usuario: Reset automático
     reset_usuario --> [*]: "Escribe Hola para nueva consulta"
+    
+    note right of crear_prospecto: 🆕 Cada campo se\nguarda inmediatamente
+    note right of actualizar_email: 🆕 Sin pérdida de datos
+    note right of actualizar_edad: 🆕 Clasificación granular
+    note right of actualizar_region: 🆕 de abandono por nivel
 ```
 
 #### 🎯 Sistema de Clasificación de Prospectos
@@ -129,6 +148,15 @@ stateDiagram-v2
 - **Costos y Becas** - Interés en financiamiento
 - **Modalidades de Estudio** - Interés en formatos de estudio
 - **Solicitud de Asesor** - Prioridad URGENTE
+
+#### 🆕 Progressive Capture States (NUEVO)
+1. **🔄 captura en proceso** - Usuario iniciando captura de datos
+2. **⚠️ abandono solo nombre** - Usuario ingresó solo nombre y abandonó
+3. **⚠️ abandono con email** - Usuario llegó hasta email y abandonó
+4. **⚠️ abandono con edad** - Usuario llegó hasta edad y abandonó
+5. **⚠️ abandono con region** - Usuario llegó hasta región y abandonó
+6. **❌ abandono incompleto** - Abandono sin datos suficientes
+7. **✅ captura completa** - Usuario completó todos los campos básicos
 
 ---
 
@@ -272,9 +300,20 @@ CREATE TABLE prospectos (
   proximo_seguimiento   timestamp with time zone,
   facultad_interes      text,
   tipo_consulta         text                     DEFAULT 'consulta_general'::text NOT NULL
+    CONSTRAINT prospectos_tipo_consulta_check
+      CHECK (tipo_consulta = ANY (ARRAY [
+        -- Valores originales
+        'info_carreras'::text, 'info_admision'::text, 'info_costos'::text,
+        'info_modalidades'::text, 'solicitar_asesor'::text, 'ingreso solo datos basicos'::text,
+        'consulta multiple carrera especifica'::text, 'consulta multiple general'::text,
+        -- 🆕 Nuevos valores para progressive capture
+        'captura en proceso'::text, 'abandono solo nombre'::text, 'abandono con email'::text,
+        'abandono con edad'::text, 'abandono con region'::text, 'abandono incompleto'::text,
+        'captura completa'::text
+      ]))
 );
 
-COMMENT ON COLUMN prospectos.tipo_consulta IS 'Tipo de consulta específica según opción del menú: consulta carrera, consulta proceso admision, consulta costos y/o becas, consulta de modalidades de estudio, solicitud de asesor, consulta general. Las solicitudes de asesor se marcan como urgentes.';
+COMMENT ON COLUMN prospectos.tipo_consulta IS '🆕 PROGRESSIVE CAPTURE: Tipo de consulta con estados granulares de captura. Incluye 7 estados de progressive capture desde "abandono solo nombre" hasta "captura completa" para análisis detallado de abandono por campo.';
 ```
 
 #### 👨‍💼 **ejecutivos** (Gestión de Asesores)
@@ -411,7 +450,7 @@ LANGUAGE plpgsql
 
 ## 📊 Flujo de Datos Actualizado
 
-### **Captura de Prospecto con Anti-Duplicados:**
+### **🆕 Progressive Capture Flow con Zero Data Loss:**
 ```mermaid
 sequenceDiagram
     participant U as Usuario WhatsApp
@@ -420,29 +459,43 @@ sequenceDiagram
     participant DAS as Dashboard API
     participant DF as Dashboard Frontend
 
-    U->>CB: Mensaje WhatsApp
-    CB->>CB: Procesar conversación
-    CB->>CB: Completar flujo específico
+    U->>CB: "Juan Pablo" (nombre)
     
-    Note over CB: Sistema Anti-Duplicados
-    CB->>CB: Validar datos mínimos
-    CB->>CB: Determinar tipo_consulta
-    CB->>CB: Asignar nivel_interes
-    
+    Note over CB: 🆕 Progressive Capture Inicio
+    CB->>CB: crearProspectoInicial()
     CB->>DAS: POST /api/botpress-webhook
-    DAS->>DAS: Mapear tipos de consulta
-    DAS->>DAS: Validar constraints
-    DAS->>SB: INSERT con constraints
-    SB-->>DAS: UUID prospecto
-    DAS-->>CB: Success response
+    Note right of CB: {tipo_consulta: "abandono solo nombre"}
+    DAS->>SB: INSERT prospecto inicial
+    SB-->>CB: UUID prospecto (guardado)
     
-    Note over CB: Reset Automático
-    CB->>CB: resetUsuario(userId)
-    CB->>U: "Escribe Hola para nueva consulta"
+    U->>CB: "juan@email.com" (email)
+    CB->>CB: actualizarProspectoCampo(email)
+    CB->>DAS: POST /api/botpress-webhook
+    Note right of CB: {tipo_consulta: "abandono con email"}
+    DAS->>SB: UPDATE prospecto existente
+    SB-->>CB: Success (actualizado)
+    
+    U->>CB: "25" (edad)
+    CB->>CB: actualizarProspectoCampo(edad)
+    DAS->>SB: UPDATE con "abandono con edad"
+    
+    U->>CB: "7" (región)
+    CB->>CB: actualizarProspectoCampo(region)
+    DAS->>SB: UPDATE con "abandono con region"
+    
+    U->>CB: "912345678" (teléfono)
+    CB->>CB: finalizarProspecto()
+    CB->>DAS: POST /api/botpress-webhook
+    Note right of CB: {tipo_consulta: "captura completa"}
+    DAS->>SB: UPDATE final - Alto interés
+    SB-->>CB: Prospecto completo
+    
+    Note over CB: ⚡ Zero Data Loss
+    Note over CB: Cada campo guardado inmediatamente
     
     DF->>DAS: GET /api/prospectos
-    DAS->>SB: SELECT con filtros urgencia
-    SB-->>DF: Lista con prioridades
+    DAS->>SB: SELECT con progressive states
+    SB-->>DF: Lista con análisis granular
 ```
 
 ### **Gestión desde Dashboard con Urgencia:**
@@ -711,23 +764,34 @@ rm -rf node_modules && npm install
 ## 📝 Notas de Desarrollo
 
 ### **Estado Actual (Agosto 2025):**
+- ✅ **🆕 Progressive Capture System** - Zero data loss implementado
 - ✅ **MVP completamente funcional** con sistema anti-duplicados
-- ✅ **Captura de prospectos** operativa con clasificación
-- ✅ **Dashboard avanzado** con gestión de urgencias
-- ✅ **Integración Supabase** estable con constraints
-- ✅ **Flujos conversacionales** completos con reinicio automático
-- ✅ **Base de datos optimizada** con índices y triggers
-- ✅ **Sistema de prioridades** implementado y funcional
+- ✅ **Captura de prospectos** operativa con 7 estados granulares
+- ✅ **Dashboard avanzado** con análisis de abandono progresivo
+- ✅ **Integración Supabase** estable con constraints progressive capture
+- ✅ **Flujos conversacionales** completos con captura incremental
+- ✅ **Base de datos optimizada** con índices y triggers para progressive capture
+- ✅ **Sistema de timeout inteligente** que preserva datos parciales
 
-### **Mejoras Implementadas en Esta Versión:**
-- 🆕 **Sistema anti-duplicados** - 1 prospecto por flujo
-- 🆕 **Clasificación automática** de tipos de consulta
-- 🆕 **Priorización de prospectos urgentes**
-- 🆕 **Reset automático** de conversaciones
-- 🆕 **Constraints de BD** actualizados
-- 🆕 **Mapeo inteligente** de flujos a tipos
-- 🆕 **Índices optimizados** para rendimiento
-- 🆕 **Webhook consolidado** para prospectos
+### **🆕 MAJOR FEATURE: Progressive Capture System:**
+- 🎯 **Zero Data Loss** - Cada campo se guarda inmediatamente al ingresarse
+- 🎯 **7 Estados Granulares** - Desde "abandono solo nombre" hasta "captura completa"
+- 🎯 **Análisis de Abandono Detallado** - Saber exactamente dónde abandonan los usuarios
+- 🎯 **Timeout Inteligente** - Guarda automáticamente datos parciales con clasificación
+- 🎯 **Dashboard Progressive Views** - Interfaz para visualizar todos los estados
+- 🎯 **Métodos Progressive Capture** - crearProspectoInicial(), actualizarProspectoCampo(), finalizarProspecto()
+- 🎯 **Database Schema Extendido** - Nuevos constraints para progressive capture
+- 🎯 **Mejor Lead Qualification** - Clasificación inteligente basada en nivel de completación
+
+### **Mejoras Previas Implementadas:**
+- ✅ **Sistema anti-duplicados** - 1 prospecto por flujo
+- ✅ **Clasificación automática** de tipos de consulta
+- ✅ **Priorización de prospectos urgentes**
+- ✅ **Reset automático** de conversaciones
+- ✅ **Constraints de BD** actualizados
+- ✅ **Mapeo inteligente** de flujos a tipos
+- ✅ **Índices optimizados** para rendimiento
+- ✅ **Webhook consolidado** para prospectos
 
 ### **Próximas Mejoras:**
 - 🔄 **Integración WhatsApp Business API** real
@@ -739,19 +803,22 @@ rm -rf node_modules && npm install
 
 ---
 
-**Última actualización:** 27 de Agosto, 2025  
-**Versión:** 2.0.0  
+**Última actualización:** 28 de Agosto, 2025  
+**Versión:** 3.0.0 - Progressive Capture System  
 **Autor:** Juan Pablo Silva feat Claude AI
 
 ---
 
 ## 🎯 Resumen de Arquitectura
 
-Esta arquitectura implementa un **sistema completo de captación de prospectos** con:
+Esta arquitectura implementa un **sistema completo de captación de prospectos con Progressive Capture** que incluye:
+- **🆕 Zero Data Loss** - Progressive Capture elimina pérdida de datos por abandono
+- **🆕 Análisis Granular de Abandono** - 7 estados detallados de captura por campo
 - **Zero duplicados** garantizados por flujo
-- **Clasificación inteligente** de prioridades
-- **Dashboard operativo** para gestión en tiempo real  
+- **Clasificación inteligente** de prioridades y completación
+- **Dashboard operativo** para gestión en tiempo real con vistas progressive
 - **Escalabilidad** probada con microservicios
-- **Base de datos robusta** con constraints y optimizaciones
+- **Base de datos robusta** con constraints y optimizaciones para progressive capture
+- **🆕 Timeout Inteligente** - Preserva y clasifica datos parciales automáticamente
 
-El sistema está **listo para producción** y preparado para integración con WhatsApp Business API real.
+El sistema está **listo para producción** con Progressive Capture System completamente funcional y preparado para integración con WhatsApp Business API real.

@@ -50,7 +50,7 @@ export function useProspectos() {
       await new Promise(resolve => setTimeout(resolve, 500))
 
       // Consultar datos del bot
-      const response = await fetch('http://localhost:3002/api/prospectos')
+      const response = await fetch('http://localhost:3001/api/prospectos')
       const result = await response.json()
 
       let filteredData: Prospecto[] = []
@@ -173,7 +173,7 @@ export function useProspectos() {
   const getStats = async (): Promise<ApiResponse<ProspectoStats>> => {
     try {
       // Consultar estadísticas del bot
-      const response = await fetch('http://localhost:3006/api/stats')
+      const response = await fetch('http://localhost:3001/api/stats')
       const result = await response.json()
       
       if (result.success && result.data) {

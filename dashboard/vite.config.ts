@@ -15,7 +15,7 @@ export default defineConfig({
     host: true,
     proxy: {
       '/api': {
-        target: 'http://localhost:3002',
+        target: 'http://localhost:3001',
         changeOrigin: true,
         secure: false,
         configure: (proxy, options) => {
@@ -23,7 +23,7 @@ export default defineConfig({
             console.log('🔴 Proxy error:', err.message);
           });
           proxy.on('proxyReq', (proxyReq, req, res) => {
-            console.log('🔄 Proxying:', req.method, req.url, '-> localhost:3002' + req.url);
+            console.log('🔄 Proxying:', req.method, req.url, '-> localhost:3001' + req.url);
           });
           proxy.on('proxyRes', (proxyRes, req, res) => {
             console.log('✅ Proxy response:', proxyRes.statusCode, req.url);

@@ -1,0 +1,16 @@
+{
+  "model": "sonnet",
+  "hooks": {
+    "Stop": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell.exe -ExecutionPolicy Bypass -WindowStyle Hidden -Command \"if (!(Get-Module -ListAvailable -Name BurntToast)) { Install-Module -Name BurntToast -Force -Scope CurrentUser }; Import-Module BurntToast; New-BurntToastNotification -Text 'Claude Code - UNIACC ChatBot', 'Session Complete', ('Finished working on testing phase - ' + (Split-Path -Leaf (Get-Location).Path)) -Sound 'Default'\""
+          }
+        ]
+      }
+    ]
+  }
+}

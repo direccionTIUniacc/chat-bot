@@ -64,6 +64,10 @@ function showProjectContext() {
   console.log('\n🔥 ARCHIVOS CRÍTICOS:');
   showCriticalFiles();
   
+  // NUEVO: Mostrar archivos dinámicos
+  console.log('\n📊 ARCHIVOS DINÁMICOS DE DEBUGGING:');
+  showDynamicFiles();
+  
   // Mostrar comandos útiles
   console.log('\n⚡ COMANDOS RÁPIDOS:');
   showQuickCommands();
@@ -130,12 +134,87 @@ function showCriticalFiles() {
   });
 }
 
+// NUEVA FUNCIÓN: Mostrar archivos dinámicos
+function showDynamicFiles() {
+  const dynamicFiles = [
+    {
+      path: './log_chatbot.txt',
+      description: 'Logs tiempo real ChatBot Backend (Puerto 3001)',
+      type: 'logs'
+    },
+    {
+      path: './log_dashboard_api.txt',
+      description: 'Logs tiempo real Dashboard + API (Puertos 3000/3002)', 
+      type: 'logs'
+    },
+    {
+      path: './supabase_config_actual.sql',
+      description: 'Schema actualizado BD con constraints y RPC functions',
+      type: 'database'
+    }
+  ];
+  
+  dynamicFiles.forEach(file => {
+    if (fs.existsSync(file.path)) {
+      const stats = fs.statSync(file.path);
+      const lastModified = stats.mtime.toLocaleString();
+      const sizeKB = Math.round(stats.size / 1024);
+      
+      console.log(`  📊 ${file.path} (${sizeKB}KB)`);
+      console.log(`      └─ ${file.description}`);
+      console.log(`      └─ Actualizado: ${lastModified}`);
+      
+      if (file.type === 'logs') {
+        // Mostrar últimas líneas de logs si existen
+        try {
+          const content = fs.readFileSync(file.path, 'utf8');
+          const lines = content.split('\n').filter(line => line.trim());
+          const recentLines = lines.slice(-3);
+          if (recentLines.length > 0) {
+            console.log(`      └─ Últimas entradas:`);
+            recentLines.forEach(line => {
+              const shortLine = line.length > 60 ? line.substring(0, 60) + '...' : line;
+              console.log(`          ${shortLine}`);
+            });
+          }
+        } catch (err) {
+          console.log(`      └─ No se pudieron leer logs recientes`);
+        }
+      }
+      
+      if (file.type === 'database') {
+        // Mostrar info del schema
+        try {
+          const content = fs.readFileSync(file.path, 'utf8');
+          const tableCount = (content.match(/create table/gi) || []).length;
+          const constraintCount = (content.match(/constraint/gi) || []).length;
+          const rpcCount = (content.match(/create.*function/gi) || []).length;
+          
+          console.log(`      └─ Tablas: ${tableCount}, Constraints: ${constraintCount}, RPC: ${rpcCount}`);
+        } catch (err) {
+          console.log(`      └─ No se pudo analizar schema`);
+        }
+      }
+    } else {
+      console.log(`  ⚠️ ${file.path} (archivo dinámico no encontrado)`);
+      console.log(`      └─ ${file.description}`);
+      console.log(`      └─ Se creará cuando sea necesario para debugging`);
+    }
+  });
+}
+
 function showQuickCommands() {
   console.log('  🚀 npm run dev (en cada carpeta para levantar servicios)');
   console.log('  🧪 Probar chat: http://localhost:3001/chat');
   console.log('  📊 Dashboard: http://localhost:3000');  
   console.log('  🔍 Health checks: /health en cada puerto');
   console.log('  📈 Stats del bot: http://localhost:3001/stats');
+  console.log('\n📊 COMANDOS DE DEBUGGING:');
+  console.log('  📋 npm run debug-logs (ver logs recientes)');
+  console.log('  🏥 npm run check-services (verificar servicios)');
+  console.log('  🧪 npm run test-chat (abrir interfaz de testing)');
+  console.log('  📈 npm run pre-testing (contexto + health check)');
+  console.log('  🔍 npm run analyze-errors (buscar errores en logs)');
 }
 
 // Función para mostrar health status
@@ -148,13 +227,13 @@ function checkServicesHealth() {
     { name: 'Dashboard API', url: 'http://localhost:3002/health' }
   ];
   
-  // Esta función podría hacer requests HTTP para verificar
-  // pero por ahora solo muestra las URLs a verificar
   services.forEach(service => {
     console.log(`🔗 ${service.name}: ${service.url}`);
   });
   
   console.log('\n💡 TIP: Abre estas URLs para verificar que los servicios estén corriendo');
+  console.log('💡 TIP: Usa "npm run debug-logs" para ver logs recientes de todos los servicios');
+  console.log('💡 TIP: Usa "npm run analyze-errors" para buscar errores específicos');
 }
 
 // Función principal
@@ -168,7 +247,9 @@ function main() {
   }
   
   console.log('\n🎯 ¡Contexto cargado! Claude Code está listo para trabajar en UNIACC ChatBot');
-  console.log('   📚 Consulta .claude/README.md para más detalles técnicos\n');
+  console.log('   📚 Consulta .claude/CLAUDE.md para memory bank principal');
+  console.log('   📊 Usa archivos dinámicos (.claude/log_*.txt) para debugging en tiempo real');
+  console.log('   🔧 Comandos disponibles: /project-status, /analyze-logs, /uniacc-system-audit\n');
 }
 
 // Ejecutar

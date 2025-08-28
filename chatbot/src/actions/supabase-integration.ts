@@ -126,7 +126,7 @@ export class SupabaseIntegration {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${this.webhookSecret}`
         },
-        timeout: 5000
+        timeout: 10000
       })
 
       console.log(`📊 Interacción registrada para ${whatsapp}`)

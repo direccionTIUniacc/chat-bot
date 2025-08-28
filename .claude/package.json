@@ -1,29 +1,49 @@
 {
-    "name": "@uniacc-chatbot/claude-context",
-    "version": "1.0.0",
-    "description": "Contexto y herramientas para Claude Code - UNIACC ChatBot System",
-    "scripts": {
-      "init": "node claude-init.js",
-      "update": "node update-context.js",
-      "report": "node update-context.js --report",
-      "health": "node claude-init.js --health",
-      "task": "node update-context.js --task",
-      "completed": "node update-context.js --completed",
-      "phase": "node update-context.js --phase"
-    },
-    "keywords": [
-      "claude-code",
-      "context",
-      "uniacc-chatbot",
-      "development-tools"
-    ],
-    "author": "Juan Pablo Silva",
-    "license": "MIT",
-    "engines": {
-      "node": ">=18.0.0"
-    },
-    "dependencies": {
-      "fs": "*",
-      "path": "*"
-    }
+  "name": "@uniacc-chatbot/claude-context",
+  "version": "1.1.0",
+  "description": "Contexto y herramientas para Claude Code - UNIACC ChatBot System",
+  "scripts": {
+    "init": "node claude-init.js",
+    "update": "node update-context.js",
+    "report": "node update-context.js --report",
+    "health": "node claude-init.js --health",
+    "task": "node update-context.js --task",
+    "completed": "node update-context.js --completed",
+    "phase": "node update-context.js --phase",
+    "check-services": "curl -s http://localhost:3001/health && curl -s http://localhost:3002/health && curl -s http://localhost:3000 -I",
+    "test-chat": "echo 'Abriendo chat demo...' && start http://localhost:3001/chat",
+    "test-dashboard": "echo 'Abriendo dashboard...' && start http://localhost:3000",
+    "debug-logs": "echo 'Logs del ChatBot:' && tail -20 log_chatbot.txt && echo '---' && echo 'Logs del Dashboard/API:' && tail -20 log_dashboard_api.txt",
+    "sync-context": "node update-context.js && echo 'Contexto sincronizado'",
+    "pre-testing": "npm run init && npm run check-services",
+    "analyze-errors": "grep -i 'error\\|failed\\|❌' log_chatbot.txt log_dashboard_api.txt | tail -10"
+  },
+  "keywords": [
+    "claude-code",
+    "context",
+    "uniacc-chatbot",
+    "development-tools",
+    "educational-chatbot",
+    "whatsapp-integration",
+    "supabase-integration"
+  ],
+  "author": "Juan Pablo Silva",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "fs": "*",
+    "path": "*"
+  },
+  "claudeConfig": {
+    "projectType": "educational-chatbot",
+    "institution": "UNIACC",
+    "architecture": "microservices",
+    "services": ["chatbot:3001", "dashboard:3000", "api:3002"],
+    "database": "supabase",
+    "currentPhase": "testing-multiple-queries",
+    "dynamicFiles": ["log_chatbot.txt", "log_dashboard_api.txt", "supabase_config_actual.sql"],
+    "lastSync": "2025-08-28"
   }
+}

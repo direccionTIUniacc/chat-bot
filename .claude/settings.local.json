@@ -1,14 +1,51 @@
 {
+  "env": {
+    "MAX_MCP_OUTPUT_TOKENS": "60000",
+    "BASH_DEFAULT_TIMEOUT_MS": "300000",
+    "BASH_MAX_TIMEOUT_MS": "600000"
+  },
+  "includeCoAuthoredBy": false,
   "permissions": {
     "allow": [
-      "Bash(npm run dev:full:*)",
+      "Bash(npm run dev:*)",
+      "Bash(npm run dev)",
+      "Bash(npm start)",
+      "Bash(npm run init:*)",
+      "Bash(npm install:*)",
+      "Bash(node .claude/claude-init.js:*)",
+      "Bash(node .claude/update-context.js:*)",
       "Bash(taskkill:*)",
       "Bash(cat:*)",
       "Bash(powershell:*)",
-      "Bash(npm start)",
-      "Bash(npm run init:*)"
+      "Bash(curl http://localhost:300*)",
+      "Bash(curl -s http://localhost:300*)",
+      "Bash(wget localhost:*)",
+      "Bash(git status)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(git pull:*)",
+      "Bash(echo:*)",
+      "Bash(ls:*)",
+      "Bash(find:*)",
+      "Bash(grep:*)",
+      "Bash(tail:*)",
+      "Bash(head:*)",
+      "Bash(wc:*)",
+      "Bash(tree:*)",
+      "Bash(cd chatbot:*)",
+      "Bash(cd dashboard:*)",
+      "Bash(cd .claude:*)",
+      "Bash(netstat -an:*)",
+      "Bash(ps aux:*)",
+      "Bash(stat:*)"
     ],
-    "deny": [],
-    "ask": []
+    "deny": [
+      "Bash(rm -rf:*)",
+      "Bash(del /f /q:*)",
+      "Bash(format:*)",
+      "Bash(DROP:*)",
+      "Bash(DELETE FROM:*)"
+    ]
   }
 }

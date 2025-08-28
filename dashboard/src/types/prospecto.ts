@@ -16,13 +16,23 @@ export const ProspectoSchema = z.object({
   facultad: z.string().optional(), // Facultad de interés
   nivel_interes: z.enum(['bajo', 'medio', 'alto']).optional(),
   tipo_consulta: z.enum([
-    'consulta_general',
-    'consulta carrera', 
-    'consulta proceso admision',
-    'consulta costos y/o becas',
-    'consulta de modalidades de estudio',
-    'solicitud de asesor',
-    'ingreso solo datos basicos'
+    // Valores originales
+    'info_carreras',
+    'info_admision', 
+    'info_costos',
+    'info_modalidades',
+    'solicitar_asesor',
+    'ingreso solo datos basicos',
+    'consulta multiple carrera especifica',
+    'consulta multiple general',
+    // 🆕 Nuevos valores para progressive capture
+    'captura en proceso',
+    'abandono solo nombre',
+    'abandono con email', 
+    'abandono con edad',
+    'abandono con region',
+    'abandono incompleto',
+    'captura completa'
   ]).optional(),
   
   // Gestión del prospecto

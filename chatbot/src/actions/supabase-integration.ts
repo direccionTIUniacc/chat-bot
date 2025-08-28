@@ -2,8 +2,8 @@ import axios from 'axios'
 
 export interface ProspectoData {
   nombre: string
-  email: string
-  telefono: string
+  email: string | null
+  telefono: string | null
   whatsapp: string
   edad?: number
   region?: string

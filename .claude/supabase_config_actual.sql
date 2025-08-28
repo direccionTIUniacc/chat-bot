@@ -86,7 +86,7 @@ create table prospectos
     fuente                text                     default 'whatsapp_bot'::text
         constraint prospectos_fuente_check
             check (fuente = ANY
-                   (ARRAY ['whatsapp_bot'::text, 'web_form'::text, 'facebook_ads'::text, 'google_ads'::text, 'referido'::text, 'uniacc_chatbot'::text, 'demo_chatbot'::text, 'asesor_request'::text])),
+                   (ARRAY ['whatsapp_bot'::text, 'web_form'::text, 'facebook_ads'::text, 'google_ads'::text, 'referido'::text, 'uniacc_chatbot'::text, 'demo_chatbot'::text, 'asesor_request'::text, 'timeout_session'::text])),
     metadata              jsonb                    default '{}'::jsonb,
     notas                 text,
     tags                  text[],
@@ -96,7 +96,7 @@ create table prospectos
     tipo_consulta         text                     default 'consulta_general'::text not null
         constraint prospectos_tipo_consulta_check
             check (tipo_consulta = ANY
-                   (ARRAY ['consulta_general'::text, 'consulta carrera'::text, 'consulta proceso admision'::text, 'consulta costos y/o becas'::text, 'consulta de modalidades de estudio'::text, 'solicitud de asesor'::text, 'ingreso solo datos basicos'::text]))
+                   (ARRAY ['info_carreras'::text, 'info_admision'::text, 'info_costos'::text, 'info_modalidades'::text, 'solicitar_asesor'::text, 'ingreso solo datos basicos'::text, 'consulta multiple carrera especifica'::text, 'consulta multiple general'::text, 'captura en proceso'::text, 'abandono solo nombre'::text, 'abandono con email'::text, 'abandono con edad'::text, 'abandono con region'::text, 'abandono incompleto'::text, 'captura completa'::text]))
 );
 
 comment on column prospectos.tipo_consulta is 'Tipo de consulta específica según opción del menú: consulta carrera, consulta proceso admision, consulta costos y/o becas, consulta de modalidades de estudio, solicitud de asesor, consulta general. Las solicitudes de asesor se marcan como urgentes.';

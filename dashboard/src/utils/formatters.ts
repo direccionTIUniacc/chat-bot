@@ -151,13 +151,32 @@ export const formatTipoConsulta = (tipoConsulta: string): string => {
   if (!tipoConsulta) return 'Consulta General'
   
   const tipoConsultaMap: Record<string, string> = {
+    // Valores actualizados (BD actual)
+    'info_carreras': 'Consulta Carreras',
+    'info_admision': 'Consulta Admisión',
+    'info_costos': 'Consulta Costos y Becas',
+    'info_modalidades': 'Consulta Modalidades',
+    'solicitar_asesor': '🚨 Solicitud de Asesor',
+    'ingreso solo datos basicos': '📝 Datos Básicos',
+    'consulta multiple carrera especifica': '🔍 Múltiple - Carrera Específica',
+    'consulta multiple general': '🔍 Múltiple - General',
+    
+    // 🆕 Progressive Capture Values
+    'captura en proceso': '🔄 Captura en Proceso',
+    'abandono solo nombre': '⚠️ Abandono - Solo Nombre',
+    'abandono con email': '⚠️ Abandono - Hasta Email', 
+    'abandono con edad': '⚠️ Abandono - Hasta Edad',
+    'abandono con region': '⚠️ Abandono - Hasta Región',
+    'abandono incompleto': '❌ Abandono Incompleto',
+    'captura completa': '✅ Captura Completa',
+    
+    // Retrocompatibilidad con valores antiguos
     'consulta carrera': 'Consulta Carrera',
     'consulta proceso admision': 'Consulta Proceso Admisión',
     'consulta costos y/o becas': 'Consulta Costos y/o Becas',
     'consulta de modalidades de estudio': 'Consulta de Modalidades de Estudio',
     'solicitud de asesor': '🚨 Solicitud de Asesor',
     'consulta general': 'Consulta General',
-    // Retrocompatibilidad con valores antiguos
     'conocer_carreras': 'Consulta Carrera',
     'proceso_admision': 'Consulta Proceso Admisión',
     'costos_becas': 'Consulta Costos y/o Becas',
@@ -170,7 +189,7 @@ export const formatTipoConsulta = (tipoConsulta: string): string => {
     'menu_principal': 'Consulta General'
   }
   
-  return tipoConsultaMap[tipoConsulta] || 'Consulta General'
+  return tipoConsultaMap[tipoConsulta] || capitalizeFirst(tipoConsulta.replace(/_/g, ' '))
 }
 
 // Formatear duración

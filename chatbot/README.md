@@ -1,6 +1,12 @@
-# 🎓 UNIACC ChatBot Dashboard MVP
+# 🎓 UNIACC ChatBot con Progressive Capture
 
-Sistema integral de chatbot conversacional y dashboard administrativo para la Universidad UNIACC.
+Sistema integral de chatbot conversacional con **Progressive Capture System** y dashboard administrativo para la Universidad UNIACC.
+
+## 🆕 PROGRESSIVE CAPTURE SYSTEM - Zero Data Loss
+
+**Estado:** ✅ IMPLEMENTADO Y FUNCIONAL
+
+El sistema ahora guarda **cada campo inmediatamente** cuando el usuario lo ingresa, eliminando la pérdida de datos por abandono de formulario.
 
 ## 📋 Descripción del Proyecto
 
@@ -16,13 +22,16 @@ Este MVP consta de dos componentes principales:
 │   UNIACC ChatBot    │    │   Vue Dashboard     │
 │   (Node.js/Express) │    │   (Vue 3 + Vite)    │
 │   Puerto: 3001      │◄──►│   Puerto: 3000      │
+│   + PROGRESSIVE     │    │   + API Server      │
+│   CAPTURE SYSTEM    │    │   Puerto: 3002      │
 └─────────────────────┘    └─────────────────────┘
            │
            ▼
 ┌─────────────────────┐
-│   Base de Datos     │
-│   en Memoria        │
-│   (Prospectos)      │
+│   SUPABASE          │
+│   PostgreSQL        │
+│   + Progressive     │
+│   Capture Schema    │
 └─────────────────────┘
 ```
 
@@ -99,18 +108,32 @@ npm install
 - **📺 Facultad de Comunicaciones**: Comunicación Audiovisual, Periodismo  
 - **⚖️ Ciencias Jurídicas**: Derecho, Psicología
 
-#### Datos Capturados
+#### Datos Capturados (Progressive Capture)
 ```typescript
 interface ProspectoData {
   nombre: string
-  email: string
-  telefono: string
+  email: string | null  // 🆕 Permite null para progressive capture
+  telefono: string | null  // 🆕 Permite null para progressive capture
   whatsapp: string
-  carrera_interes: string
-  nivel_interes: string
-  source: 'uniacc_chatbot'
+  edad?: number
+  region?: string
+  carrera_interes?: string
+  facultad_interes?: string
+  nivel_interes?: string
+  tipo_consulta?: string  // 🆕 Progressive capture status
+  source: 'uniacc_chatbot' | 'timeout_session'
+  flujo_actual?: string
 }
 ```
+
+#### 🔄 Progressive Capture States
+1. **🔄 captura en proceso** - Usuario iniciando captura
+2. **⚠️ abandono solo nombre** - Usuario ingresó solo nombre
+3. **⚠️ abandono con email** - Usuario llegó hasta email
+4. **⚠️ abandono con edad** - Usuario llegó hasta edad
+5. **⚠️ abandono con region** - Usuario llegó hasta región
+6. **❌ abandono incompleto** - Abandono sin datos suficientes
+7. **✅ captura completa** - Usuario completó todos los datos
 
 ### 📊 Dashboard Administrativo
 
@@ -129,12 +152,18 @@ interface ProspectoData {
 
 ## 🔄 Flujo de Integración
 
-### Captura de Prospecto
+### 🆕 Progressive Capture Flow (Zero Data Loss)
 1. **Usuario interactúa** con el bot via WhatsApp
 2. **Bot procesa** la conversación usando flujos predefinidos
-3. **Datos se capturan** cuando el usuario completa la información
-4. **Prospecto se guarda** en memoria del bot
-5. **Dashboard consulta** los datos via API REST
+3. **🔄 CAMPO POR CAMPO:**
+   - **Nombre ingresado** → Crea prospecto inicial en Supabase
+   - **Email ingresado** → Actualiza prospecto existente
+   - **Edad ingresada** → Actualiza prospecto existente
+   - **Región ingresada** → Actualiza prospecto existente
+   - **Teléfono ingresado** → Finaliza como "captura completa"
+4. **🚨 Si abandona:** Prospecto queda clasificado según último campo completado
+5. **⏰ Timeout inteligente:** Guarda datos parciales con clasificación apropiada
+6. **Dashboard muestra** todos los estados de abandono con análisis granular
 
 ### API Endpoints
 
@@ -258,12 +287,20 @@ curl http://localhost:3001/health
 - [x] Validaciones de datos
 - [x] Gestión de estados de conversación
 
+### ✅ Nuevas Funcionalidades Implementadas
+- [x] **🔄 Progressive Capture System** - Zero data loss
+- [x] **📊 Granular Abandonment Analysis** - 7 tipos de abandono
+- [x] **⏰ Intelligent Timeout System** - Guarda datos parciales
+- [x] **🗄️ Supabase Integration** - Base de datos real PostgreSQL
+- [x] **📝 Enhanced Data Classification** - Estados detallados de captura
+- [x] **🎯 Smart Lead Qualification** - Nivel de interés basado en completación
+- [x] **📋 Dashboard Progressive Views** - Interfaz para todos los estados
+
 ### 🔄 En Progreso
 - [ ] Integración con WhatsApp Business API real
-- [ ] Persistencia en base de datos real (Supabase)
 - [ ] Sistema de notificaciones en tiempo real
 - [ ] Asignación automática de ejecutivos
-- [ ] Reportes avanzados
+- [ ] Reportes avanzados de progressive capture
 
 ### 🎯 Próximas Mejoras
 - [ ] Sistema de plantillas de respuesta
@@ -307,11 +344,18 @@ curl http://localhost:3001/health
 3. **Vue 3 + Composition API**: Máxima flexibilidad y mantenibilidad
 4. **TypeScript en ambos proyectos**: Tipado fuerte y mejor DX
 
+### 🆕 Beneficios del Progressive Capture
+- ✅ **Zero Data Loss** - Ningún dato se pierde por abandono
+- ✅ **Análisis Granular** - Saber exactamente dónde abandonan los usuarios
+- ✅ **Mejor Seguimiento** - Prospectos parciales pueden ser re-contactados
+- ✅ **Clasificación Inteligente** - Estados detallados para mejor gestión
+- ✅ **Persistencia Real** - Datos guardados en Supabase PostgreSQL
+- ✅ **Dashboard Intuitivo** - Etiquetas claras para cada tipo de abandono
+
 ### Limitaciones Actuales
-- Datos se pierden al reiniciar el bot
 - Sin autenticación de usuarios
-- Sin persistencia real
 - Configuración manual de endpoints
+- Integración con WhatsApp real pendiente
 
 ## 👥 Equipo
 

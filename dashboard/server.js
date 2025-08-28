@@ -252,19 +252,27 @@ app.post('/api/prospectos', async (req, res) => {
 // Mapear flujo del chatbot al tipo de consulta para la DB
 function mapearFlujoATipoConsulta(flujoActual) {
   const mapeo = {
-    'conocer_carreras': 'consulta carrera',
-    'proceso_admision': 'consulta proceso admision', 
-    'costos_becas': 'consulta costos y/o becas',
-    'modalidades_estudio': 'consulta de modalidades de estudio',
-    'hablar_asesor': 'solicitud de asesor',
+    // Mapeos originales
+    'conocer_carreras': 'info_carreras',
+    'proceso_admision': 'info_admision', 
+    'costos_becas': 'info_costos',
+    'modalidades_estudio': 'info_modalidades',
+    'hablar_asesor': 'solicitar_asesor',
+    
     // Mapeos adicionales por si llegan otros flujos
-    'exploracion_carreras': 'consulta carrera',
-    'detalle_carrera': 'consulta carrera',
-    'captura_datos': 'solicitud de asesor',
-    'menu_principal': 'consulta general'
+    'exploracion_carreras': 'info_carreras',
+    'detalle_carrera': 'info_carreras',
+    'captura_datos': 'solicitar_asesor',
+    'captura_inicial': 'ingreso solo datos basicos',
+    'menu_principal': 'consulta multiple general',
+    
+    // 🆕 Mapeos para progressive capture - NO deberían llegar aquí
+    // pero incluimos por seguridad
+    'timeout_session': 'abandono incompleto',
+    'abandono_parcial': 'abandono incompleto'
   }
   
-  return mapeo[flujoActual] || 'consulta general'
+  return mapeo[flujoActual] || 'consulta multiple general'
 }
 
 // Determinar nivel de interés basado en el tipo de consulta
@@ -290,8 +298,9 @@ app.post('/api/botpress-webhook', async (req, res) => {
     console.log('📊 Procesando prospecto UNIACC:', eventData)
     console.log('🔧 DEBUG - flujo_actual recibido:', eventData.flujo_actual)
     
-    const tipoConsulta = mapearFlujoATipoConsulta(eventData.flujo_actual)
-    console.log('🔧 DEBUG - tipo_consulta mapeado:', tipoConsulta)
+    // Priorizar tipo_consulta del chatbot, sino mapear desde flujo_actual
+    const tipoConsulta = eventData.tipo_consulta || mapearFlujoATipoConsulta(eventData.flujo_actual)
+    console.log('🔧 DEBUG - tipo_consulta usado:', tipoConsulta, eventData.tipo_consulta ? '(del chatbot)' : '(mapeado)')
 
     const { supabase } = useSupabase()
 

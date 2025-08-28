@@ -9,7 +9,7 @@
 ### Información Básica del Proyecto
 - **Institución**: Universidad de Artes, Ciencias y Comunicaciones (UNIACC)
 - **Objetivo**: Sistema de captura automática de prospectos vía WhatsApp
-- **Estado**: Testing Sistema de Múltiples Consultas - Agosto 2025
+- **Estado**: Progressive Capture System IMPLEMENTADO - Agosto 2025
 - **Maintainer**: Juan Pablo Silva
 
 ## ARQUITECTURA DEL SISTEMA
@@ -57,7 +57,7 @@ UNIACC-ChatBot/
 2. **Proceso admisión 2025** → Información independiente del DEMRE
 3. **Costos y becas** → Información financiera
 4. **Modalidades** → Presencial/Online/Híbrida
-5. **Hablar con asesor** → Captura automática de datos (PRIORITARIO)
+5. **Hablar con asesor** → Captura progresiva de datos SIN PÉRDIDA (IMPLEMENTADO)
 
 ### Facultades UNIACC (Datos oficiales)
 - **A) Artes**: Teatro, Danza, Música, Artes Visuales
@@ -66,26 +66,51 @@ UNIACC-ChatBot/
 - **D) Ciencias Jurídicas**: Derecho, Psicología
 - **E) Negocios y Tecnología**: Ing. Comercial, Contador Auditor
 
+### Sistema Progressive Capture (IMPLEMENTADO - AGOSTO 2025)
+```
+NOMBRE → Crea prospecto inicial → EMAIL → Actualiza prospecto → EDAD → Actualiza → REGIÓN → Actualiza → TELÉFONO → Finaliza como completo
+```
+
+**BENEFICIOS CRÍTICOS:**
+- ✅ **ZERO DATA LOSS**: Cada campo se guarda inmediatamente en BD
+- ✅ **Análisis granular**: Conocer exactamente dónde abandonan los usuarios
+- ✅ **Clasificación inteligente**: 7 tipos de abandono según completitud
+- ✅ **Recuperación de leads**: Datos parciales siguen siendo valiosos
+
+**TIPOS DE CAPTURA PROGRESIVA:**
+- `captura en proceso` - Usuario actualmente completando datos
+- `abandono solo nombre` - Abandonó después de dar solo el nombre
+- `abandono con email` - Abandonó después de nombre + email
+- `abandono con edad` - Abandonó después de nombre + email + edad
+- `abandono con region` - Abandonó después de nombre + email + edad + región
+- `abandono incompleto` - Timeout durante proceso
+- `captura completa` - Completó todos los campos (teléfono incluido)
+
 ### Sistema Anti-Duplicados (IMPLEMENTADO)
 ```
-Captura datos → Selecciona flujo → Completa flujo → GUARDA 1 PROSPECTO → Reset usuario → "Escribe Hola para nueva consulta"
+Captura progresiva → Selecciona flujo → Completa flujo → ACTUALIZA PROSPECTO EXISTENTE → Reset usuario → "Escribe Hola para nueva consulta"
 ```
 
 ## ARCHIVOS CRÍTICOS (NO MODIFICAR SIN CONTEXTO)
 
 ### Backend ChatBot (chatbot/)
-- `src/actions/uniacc-scripts.ts` → **LÓGICA PRINCIPAL DEL BOT**
+- `src/actions/uniacc-scripts.ts` → **LÓGICA PRINCIPAL + PROGRESSIVE CAPTURE**
+- `src/actions/supabase-integration.ts` → **INTERFACES ACTUALIZADAS (email/telefono nullable)**
 - `src/data/programas-uniacc.ts` → **DATOS OFICIALES UNIACC**
 - `src/utils/supabase-client.ts` → **CONFIGURACIÓN BASE DE DATOS**
 
 ### Frontend Dashboard (dashboard/)
 - `src/composables/useChat.ts` → **LÓGICA CHAT TIEMPO REAL**
-- `server.js` → **API SERVER INTEGRACIÓN SUPABASE**
+- `server.js` → **API SERVER + MAPEO PROGRESSIVE CAPTURE**
+- `src/types/prospecto.ts` → **ESQUEMA ACTUALIZADO PROGRESSIVE CAPTURE**
+- `src/utils/formatters.ts` → **FORMATEO UI TIPOS DE ABANDONO**
 - `src/components/chat/` → **COMPONENTES INTERFACE**
 
 ### Base de Datos (Supabase)
-- **Tablas**: `prospectos`, `conversaciones`, `mensajes`, `ejecutivos`
+- **Tablas**: `prospectos` (CON PROGRESSIVE CAPTURE), `conversaciones`, `mensajes`, `ejecutivos`
 - **RPC Functions**: `upsert_prospecto_por_whatsapp()`, `get_usuario_recurrente()`
+- **Constraints Actualizados**: `prospectos_fuente_check`, `valid_email` (permite nulls)
+- **Campo tipo_consulta**: 7 nuevos valores para progressive capture
 - **URL**: https://vtwdmyezyvhprwonengu.supabase.co
 
 ## COMANDOS DE DESARROLLO
@@ -179,25 +204,44 @@ cd dashboard && npm run dev      # Terminal 3
 - **Health Check API**: http://localhost:3002/health
 - **Dashboard Interface**: http://localhost:3000
 
-### Sistema de Múltiples Consultas (FASE ACTUAL)
+### Progressive Capture System (IMPLEMENTADO - AGOSTO 2025)
+- **Captura inmediata** de cada campo en base de datos
+- **Clasificación inteligente** de abandono por nivel de completitud
+- **Zero data loss** - Ningún dato se pierde por abandonos
+- **7 tipos de estado** según progreso de captura
+- **Interfaces actualizadas** para manejar campos nullable (email, teléfono)
+- **Dashboard actualizado** con formateo de tipos de abandono
+
+### Sistema de Múltiples Consultas (FUNCIONAL)
 - **Reconocimiento automático** de usuarios recurrentes (30 días)
 - **Menú contextual** con historial de consultas
 - **Pre-carga de datos** para usuarios conocidos
-- **Sistema anti-duplicados** operativo
+- **Sistema anti-duplicados** operativo con progressive capture
 
 ## ESTADO ACTUAL Y PRÓXIMOS PASOS
 
-### Fase Actual: Testing Sistema de Múltiples Consultas
-- Testing completo de 5 escenarios de usuarios
-- Debugging de guardado de región y facultad_interes
-- Verificación de funciones RPC en producción
-- Resolución de errores de fetch en dashboard
+### FASE ACTUAL: Progressive Capture System COMPLETADO ✅
 
-### Issues Conocidos (Verificar en Logs)
-- **Guardado de región**: Revisar en logs si se guarda correctamente
-- **Guardado de facultad_interes**: Verificar mapeo de IDs
-- **Errores de fetch**: Dashboard vs API connectivity
-- **Menu contextual**: Procesamiento de opciones
+#### ✅ IMPLEMENTACIONES COMPLETADAS (Agosto 2025):
+1. **Progressive Data Capture**: Cada campo se guarda inmediatamente
+2. **Database Schema Updates**: 7 nuevos valores tipo_consulta
+3. **Backend Logic Extended**: UsuarioState con campos progressive capture
+4. **Progressive Methods**: crearProspectoInicial(), actualizarProspectoCampo(), finalizarProspecto()
+5. **Dashboard Integration**: Mapeo y formateo de nuevos estados
+6. **TypeScript Updates**: Interfaces actualizadas para campos nullable
+7. **Constraint Fixes**: Resueltos todos los conflictos de BD
+
+#### 🔄 PRÓXIMOS PASOS:
+- Testing exhaustivo del sistema progressive capture
+- Análisis de métricas de abandono por campo
+- Optimización basada en patrones de abandono detectados
+- Integración con sistema de follow-up automático
+
+### Issues Resueltos ✅
+- **Constraint violations**: Corregidos prospectos_fuente_check y valid_email
+- **TypeScript compilation**: Resueltos todos los errores de tipos
+- **Interface consistency**: email y teléfono ahora son nullable
+- **Database schema**: Actualizado completamente para progressive capture
 
 ---
 

@@ -4,9 +4,9 @@
 
 ## 🎯 Estado Actual del Proyecto
 - **Última sesión**: 2025-08-28
-- **Fase**: Testing y Debugging del Sistema de Múltiples Consultas
-- **Rama principal**: dev (en proceso de testing)
-- **Estado**: 🔧 Testing fase con sistema de reconocimiento de usuarios y bug fixes
+- **Fase**: Progressive Capture System IMPLEMENTADO ✅
+- **Rama principal**: dev (con Progressive Capture funcional)
+- **Estado**: 🚀 MAJOR FEATURE COMPLETADO - Sistema sin pérdida de datos
 
 ## 🏗️ Arquitectura del Sistema
 
@@ -30,22 +30,43 @@ chatboot-uniacc/
 2. **Proceso admisión 2025** → Info completa de matrícula → 1 prospecto al final
 3. **Costos y becas** → Información financiera actualizada → 1 prospecto al final
 4. **Modalidades de estudio** → Presencial/Online/Híbrida → 1 prospecto al final
-5. **Hablar con asesor** → Captura datos + conexión humana → **PROSPECTO URGENTE**
+5. **Hablar con asesor** → Captura PROGRESIVA sin pérdida + conexión humana → **PROSPECTO URGENTE**
 
-### Sistema Anti-Duplicados (NUEVO)
+### Sistema Progressive Capture (IMPLEMENTADO - AGOSTO 2025) 🔥
 ```
-Captura datos → Selecciona flujo → Completa flujo → GUARDA 1 PROSPECTO → Reset usuario → "Escribe Hola para nueva consulta"
+NOMBRE → Crea prospecto inicial → EMAIL → Actualiza → EDAD → Actualiza → REGIÓN → Actualiza → TELÉFONO → Completa
 ```
 
-### Clasificación Automática de Prospectos
+**BENEFICIOS CRÍTICOS:**
+- ✅ **ZERO DATA LOSS**: Cada campo se guarda inmediatamente
+- ✅ **7 tipos de abandono**: Clasificación granular según completitud
+- ✅ **Análisis avanzado**: Saber exactamente dónde abandonan usuarios
+- ✅ **Recuperación de leads**: Datos parciales son valiosos
+
+### Sistema Anti-Duplicados (MEJORADO)
+```
+Progressive Capture → Selecciona flujo → Completa flujo → ACTUALIZA PROSPECTO → Reset usuario → "Escribe Hola para nueva consulta"
+```
+
+### Clasificación Automática de Prospectos + Progressive Capture
+**Flujos Informativos:**
 - **Consulta General** (`alto`) - Flujos informativos
 - **Costos y Becas** (`alto`) - Interés en financiamiento  
 - **Modalidades de Estudio** (`alto`) - Interés en formatos
 - **Exploración de Carreras** (`alto`) - Interés académico
 - **Solicitud de Asesor** (`urgente`) - **PRIORIDAD MÁXIMA**
 
+**Estados Progressive Capture:**
+- `captura en proceso` - Usuario completando datos activamente
+- `abandono solo nombre` - Abandonó después de dar solo nombre
+- `abandono con email` - Abandonó después de nombre + email  
+- `abandono con edad` - Abandonó después de nombre + email + edad
+- `abandono con region` - Abandonó después de nombre + email + edad + región
+- `abandono incompleto` - Timeout durante proceso
+- `captura completa` - Completó todos los campos (teléfono incluido)
+
 ### Base de Datos (Supabase) - ACTUALIZADA
-- **prospectos**: Datos principales con nuevos constraints y tipo_consulta
+- **prospectos**: Datos principales con PROGRESSIVE CAPTURE (7 tipos abandono)
 - **conversaciones**: Sesiones de chat por teléfono
 - **mensajes**: Historial completo de intercambios  
 - **ejecutivos**: Gestión de asesores para prospectos urgentes

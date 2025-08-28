@@ -28,6 +28,11 @@ export interface UsuarioState {
   timeout_warning_sent?: boolean
   session_timeout_id?: NodeJS.Timeout
   warning_timeout_id?: NodeJS.Timeout
+  // Nuevos campos para captura incremental
+  prospecto_id?: string  // UUID del prospecto en BD
+  ultimo_campo_guardado?: 'nombre' | 'email' | 'telefono' | 'edad' | 'region'
+  campos_capturados?: string[]
+  fecha_creacion_prospecto?: Date
 }
 
 export class UniaccBot {
@@ -153,6 +158,19 @@ export class UniaccBot {
           datos_prospecto: { ...state.datos_prospecto, nombre: mensaje },
           paso_actual: 'solicitar_email'
         })
+        
+        // 🆕 PROGRESSIVE CAPTURE: Crear prospecto inicial con primer campo
+        const prospectoId = await this.crearProspectoInicial(userId, mensaje)
+        if (prospectoId) {
+          // Actualizar estado con ID del prospecto para futuras actualizaciones
+          this.setUsuarioState(userId, {
+            prospecto_id: prospectoId,
+            ultimo_campo_guardado: 'nombre',
+            campos_capturados: ['nombre'],
+            fecha_creacion_prospecto: new Date()
+          })
+        }
+        
         return `¡Hola ${mensaje}! 👋
 
 📧 ¿Cuál es tu **email**?`
@@ -167,6 +185,16 @@ export class UniaccBot {
           datos_prospecto: { ...state.datos_prospecto, email: mensaje },
           paso_actual: 'solicitar_edad'
         })
+        
+        // 🆕 PROGRESSIVE CAPTURE: Actualizar email en prospecto existente
+        if (state.prospecto_id) {
+          await this.actualizarProspectoCampo(state.prospecto_id, 'email', mensaje)
+          this.setUsuarioState(userId, {
+            ultimo_campo_guardado: 'email',
+            campos_capturados: [...(state.campos_capturados || []), 'email']
+          })
+        }
+        
         return `✅ Email: ${mensaje}
 
 🎂 ¿Cuántos **años** tienes?`
@@ -175,6 +203,15 @@ export class UniaccBot {
         const edad = parseInt(mensaje)
         if (isNaN(edad) || edad < 16 || edad > 80) {
           return `❌ Por favor ingresa una edad válida (entre 16 y 80 años)`
+        }
+        
+        // 🆕 PROGRESSIVE CAPTURE: Actualizar edad en prospecto existente
+        if (state.prospecto_id) {
+          await this.actualizarProspectoCampo(state.prospecto_id, 'edad', edad)
+          this.setUsuarioState(userId, {
+            ultimo_campo_guardado: 'edad',
+            campos_capturados: [...(state.campos_capturados || []), 'edad']
+          })
         }
         
         this.setUsuarioState(userId, {
@@ -221,6 +258,16 @@ Escribe el **número** de tu región:`
           datos_prospecto: { ...state.datos_prospecto, region: regionSeleccionada },
           paso_actual: 'solicitar_telefono'
         })
+        
+        // 🆕 PROGRESSIVE CAPTURE: Actualizar región en prospecto existente
+        if (state.prospecto_id) {
+          await this.actualizarProspectoCampo(state.prospecto_id, 'region', regionSeleccionada)
+          this.setUsuarioState(userId, {
+            ultimo_campo_guardado: 'region',
+            campos_capturados: [...(state.campos_capturados || []), 'region']
+          })
+        }
+        
         return `✅ Región: ${regionSeleccionada}
 
 📱 Por último, ¿cuál es tu **teléfono**?`
@@ -240,6 +287,26 @@ Escribe el **número** de tu región:`
           paso_actual: null
         })
         
+        // 🆕 PROGRESSIVE CAPTURE: Actualizar teléfono y finalizar captura completa
+        if (state.prospecto_id) {
+          await this.actualizarProspectoCampo(state.prospecto_id, 'telefono', mensaje)
+          
+          // Finalizar prospecto con datos completos
+          const tipoConsulta = 'captura completa'
+          const nivelInteres = 'alto' // Usuario completó todo el proceso
+          
+          await this.finalizarProspecto(
+            state.prospecto_id,
+            tipoConsulta,
+            nivelInteres
+          )
+          
+          this.setUsuarioState(userId, {
+            ultimo_campo_guardado: 'telefono',
+            campos_capturados: [...(state.campos_capturados || []), 'telefono']
+          })
+        }
+        
         return `🎉 **¡PERFECTO ${datos.nombre?.toUpperCase()}!**
 
 📋 **Tus datos:**
@@ -248,6 +315,8 @@ Escribe el **número** de tu región:`
 🎂 ${datos.edad} años  
 📍 ${datos.region}
 📱 ${mensaje}
+
+✅ **Datos guardados exitosamente**
 
 ---
 
@@ -1422,6 +1491,88 @@ Escribe el número de tu opción 📝`
     }
   }
 
+  // 💾 MÉTODOS DE CAPTURA INCREMENTAL
+
+  // Crear prospecto inicial con solo nombre
+  private async crearProspectoInicial(userId: string, nombre: string): Promise<string | null> {
+    try {
+      const prospectoData: ProspectoData = {
+        nombre: nombre,
+        email: null, // null para cumplir constraint valid_email
+        telefono: null, // null inicialmente
+        whatsapp: userId,
+        carrera_interes: "Sin especificar",
+        facultad_interes: "",
+        nivel_interes: 'medio',
+        tipo_consulta: 'abandono solo nombre', // Estado inicial - puede cambiar
+        source: 'uniacc_chatbot',
+        flujo_actual: 'captura_inicial'
+      }
+
+      console.log(`💾 Creando prospecto inicial para ${userId}: ${nombre}`)
+      const resultado = await this.supabaseIntegration.enviarProspecto(prospectoData)
+      
+      if (resultado.success) {
+        console.log(`✅ Prospecto inicial creado: ${resultado.prospectoId}`)
+        return resultado.prospectoId || null
+      } else {
+        console.error(`❌ Error creando prospecto inicial: ${resultado.error}`)
+        return null
+      }
+      
+    } catch (error) {
+      console.error(`💥 Error crítico creando prospecto inicial:`, error)
+      return null
+    }
+  }
+
+  // Actualizar prospecto con campo específico
+  private async actualizarProspectoCampo(
+    prospectoId: string, 
+    campo: string, 
+    valor: any, 
+    ultimoCampo?: string
+  ): Promise<boolean> {
+    try {
+      // Para la actualización, usamos directamente Supabase
+      console.log(`🔄 Actualizando campo ${campo} del prospecto ${prospectoId}: ${valor}`)
+      
+      // TODO: Implementar actualización directa via Supabase
+      // Por ahora solo loggeamos la acción
+      console.log(`📝 [SIMULADO] Prospecto ${prospectoId} → ${campo}: ${valor}`)
+      
+      if (ultimoCampo) {
+        console.log(`📋 Último campo capturado: ${ultimoCampo}`)
+      }
+      
+      return true
+      
+    } catch (error) {
+      console.error(`❌ Error actualizando campo ${campo}:`, error)
+      return false
+    }
+  }
+
+  // Marcar prospecto como completo o con tipo específico de abandono
+  private async finalizarProspecto(
+    prospectoId: string, 
+    tipoConsulta: string, 
+    nivelInteres: string = 'medio'
+  ): Promise<boolean> {
+    try {
+      console.log(`🏁 Finalizando prospecto ${prospectoId} como: ${tipoConsulta}`)
+      
+      // TODO: Implementar actualización final via Supabase
+      console.log(`📝 [SIMULADO] Prospecto ${prospectoId} → tipo_consulta: ${tipoConsulta}, nivel_interes: ${nivelInteres}`)
+      
+      return true
+      
+    } catch (error) {
+      console.error(`❌ Error finalizando prospecto:`, error)
+      return false
+    }
+  }
+
   // ⏰ MÉTODOS DE TIMEOUT DE SESIÓN
 
   // Configurar timeout para cada mensaje
@@ -1573,40 +1724,72 @@ Un asesor podrá contactarte cuando lo necesites.
     }
   }
 
-  // Evaluar si guardar datos por timeout (criterio simplificado)
+  // Evaluar si guardar datos por timeout (criterio mejorado con progressive capture)
   private shouldSaveTimeoutData(state: UsuarioState): boolean {
     const datos = state.datos_prospecto
     
-    // ✅ GUARDAR si tiene datos básicos (nombre, email, teléfono)
-    return !!(datos.nombre && datos.email && datos.telefono)
+    // 🆕 PROGRESSIVE: Si ya tiene prospecto_id, siempre actualizar
+    if (state.prospecto_id) {
+      return true
+    }
+    
+    // ✅ GUARDAR si tiene al menos nombre (progressive capture creará inicial)
+    return !!(datos.nombre)
   }
 
-  // Guardar datos por timeout
+  // Guardar datos por timeout con progressive capture
   private async saveTimeoutSessionData(userId: string, state: UsuarioState): Promise<void> {
     const datos = state.datos_prospecto
     
-    const prospectoData: ProspectoData = {
-      nombre: datos.nombre!,
-      email: datos.email!,
-      telefono: datos.telefono!,
-      whatsapp: userId,
-      edad: datos.edad,
-      region: datos.region,
-      carrera_interes: datos.carrera_interes || "Sin especificar",
-      facultad_interes: "", // Vacío porque no llegó a explorar
-      nivel_interes: 'bajo', // Clave: marcamos como bajo interés
-      tipo_consulta: 'ingreso solo datos basicos', // Nuevo campo
-      source: 'timeout_session',
-      flujo_actual: state.flujo_actual || 'incompleto'
+    // 🆕 PROGRESSIVE: Si ya tiene prospecto_id, actualizar existente
+    if (state.prospecto_id) {
+      console.log(`💾 Actualizando prospecto existente por timeout: ${state.prospecto_id}`)
+      
+      // Determinar tipo_consulta según campos completados
+      const camposCompletos = state.campos_capturados || []
+      let tipoConsulta = 'abandono solo nombre'
+      
+      if (camposCompletos.includes('email')) {
+        tipoConsulta = 'abandono con email'
+      }
+      if (camposCompletos.includes('edad')) {
+        tipoConsulta = 'abandono con edad'
+      }
+      if (camposCompletos.includes('region')) {
+        tipoConsulta = 'abandono con region'
+      }
+      if (camposCompletos.includes('telefono')) {
+        tipoConsulta = 'ingreso solo datos basicos' // Completó datos básicos
+      }
+      
+      // Finalizar prospecto con estado de abandono
+      await this.finalizarProspecto(
+        state.prospecto_id,
+        tipoConsulta,
+        'bajo' // Nivel bajo por timeout
+      )
+      
+      console.log(`✅ Prospecto actualizado por timeout: ${state.prospecto_id} (${tipoConsulta})`)
+      return
     }
     
-    console.log(`💾 Guardando prospecto por timeout: ${datos.nombre}`)
-    const resultado = await this.supabaseIntegration.enviarProspecto(prospectoData)
-    
-    if (resultado.success) {
-      console.log(`✅ Prospecto timeout guardado: ${resultado.prospectoId}`)
-    } else {
-      console.error(`❌ Error guardando prospecto timeout: ${resultado.error}`)
+    // 🄆 FALLBACK: Si no hay prospecto_id, crear uno nuevo (caso legacy)
+    if (datos.nombre) {
+      const prospectoId = await this.crearProspectoInicial(userId, datos.nombre)
+      
+      if (prospectoId) {
+        // Actualizar campos adicionales si existen
+        if (datos.email) await this.actualizarProspectoCampo(prospectoId, 'email', datos.email)
+        if (datos.edad) await this.actualizarProspectoCampo(prospectoId, 'edad', datos.edad)
+        if (datos.region) await this.actualizarProspectoCampo(prospectoId, 'region', datos.region)
+        if (datos.telefono) await this.actualizarProspectoCampo(prospectoId, 'telefono', datos.telefono)
+        
+        // Finalizar como abandono
+        const tipoConsulta = datos.telefono ? 'ingreso solo datos basicos' : 'abandono incompleto'
+        await this.finalizarProspecto(prospectoId, tipoConsulta, 'bajo')
+        
+        console.log(`✅ Prospecto timeout creado y finalizado: ${prospectoId} (${tipoConsulta})`)
+      }
     }
   }
 

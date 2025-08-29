@@ -44,6 +44,9 @@ app.use(cors({
 app.use(express.json({ limit: '10mb' }))
 app.use(express.urlencoded({ extended: true }))
 
+// Servir archivos estáticos (CSS, JS, HTML)
+app.use(express.static('public'))
+
 // Inicializar servicios
 const whatsappSender = new WhatsAppSender(
   process.env.WHATSAPP_ACCESS_TOKEN!,
@@ -248,8 +251,18 @@ app.get('/webhook', (req: Request, res: Response) => {
   }
 })
 
-// **ENDPOINT: Página web de demostración**
+// **ENDPOINT: Página principal - redireccionar a chat TypeScript**
 app.get('/', (req: Request, res: Response) => {
+  res.redirect('/chat-demo')
+})
+
+// **ENDPOINT: Chat Demo TypeScript (RECOMENDADO)**
+app.get('/chat-demo', (req: Request, res: Response) => {
+  res.sendFile('chat-demo.html', { root: 'public' })
+})
+
+// **ENDPOINT: Chat Demo JavaScript embebido (LEGACY)**
+app.get('/chat', (req: Request, res: Response) => {
   const html = `
 <!DOCTYPE html>
 <html lang="es">
@@ -490,6 +503,14 @@ app.get('/', (req: Request, res: Response) => {
             const message = messageInput.value.trim();
             if (!message) return;
 
+            // ⏰ INICIAR POLLING DE TIMEOUT SI ES EL PRIMER MENSAJE
+            if (message.toLowerCase() === 'hola' || message.toLowerCase() === 'hi') {
+                console.log('🚀 [INIT] Iniciando polling de timeout...');
+                setTimeout(() => {
+                    startTimeoutChecking(currentPhone);
+                }, 1000); // 1 segundo para que el mensaje se procese
+            }
+
             messageInput.value = '';
             messageInput.disabled = true;
 
@@ -526,41 +547,56 @@ app.get('/', (req: Request, res: Response) => {
 
         // Función para verificar mensajes de timeout
         async function checkForTimeoutMessages() {
-            if (!currentUserId) return;
+            if (!currentUserId) {
+                console.log('🔍 [POLLING] Sin usuario activo - saltando verificación');
+                return;
+            }
+            
+            console.log(\`🔍 [POLLING] Verificando timeouts para: \${currentUserId}\`);
             
             try {
                 const response = await fetch(\`/check-timeout/\${currentUserId}\`);
                 const data = await response.json();
                 
-                if (data.success && data.hasTimeout && data.message) {
-                    // Mostrar mensaje de timeout como respuesta del bot
-                    addResult('⏰ Sistema de Timeout', { 
+                console.log('🔍 [POLLING] Respuesta del servidor:', data);
+                
+                if (data.status === 'warning' || data.status === 'timeout') {
+                    console.log(\`🎯 [POLLING] ¡Mensaje encontrado! Tipo: \${data.status}\`);
+                    
+                    // Mostrar mensaje automático de timeout
+                    addResult('⏰ Mensaje Automático del Sistema', { 
                         conversation: {
-                            user_message: '(Sistema automático)',
+                            user_message: '(timeout automático)',
                             bot_response: data.message
                         }
                     }, 'chat');
                     
-                    // Si es un warning, no detener el checking
-                    // Si es timeout final, limpiar el checking
-                    if (data.type === 'timeout') {
-                        clearInterval(timeoutCheckInterval);
-                        currentUserId = null;
+                    console.log(\`⚠️ [TIMEOUT] Mensaje mostrado - Tipo: \${data.status} - Usuario: \${currentUserId}\`);
+                    
+                    // Si es timeout final, detener el polling
+                    if (data.status === 'timeout') {
+                        console.log('⏰ [TIMEOUT-FINAL] Deteniendo polling - sesión terminada');
+                        stopTimeoutChecking();
                     }
+                } else {
+                    console.log('🔍 [POLLING] Sin mensajes pendientes');
                 }
             } catch (error) {
-                console.error('Error verificando timeout:', error);
+                console.error('🔍 [POLLING] Error verificando timeout:', error);
             }
         }
 
         // Función para iniciar el sistema de timeout cuando se inicia una conversación
         function startTimeoutChecking(userId) {
+            console.log(\`🚀 [INIT] Iniciando timeout checking para: \${userId}\`);
+            
             currentUserId = userId;
             
-            // Verificar cada 5 segundos si hay mensajes de timeout
-            timeoutCheckInterval = setInterval(checkForTimeoutMessages, 5000);
+            // Verificar cada 3 segundos si hay mensajes de timeout (más frecuente para mejor UX)
+            timeoutCheckInterval = setInterval(checkForTimeoutMessages, 3000);
             
-            console.log(\`⏰ Sistema de timeout iniciado para usuario: \${userId}\`);
+            console.log(\`⏰ [POLLING] Sistema de timeout iniciado para usuario: \${userId} - Verificando cada 3s\`);
+            console.log(\`⏰ [POLLING] Interval ID: \${timeoutCheckInterval}\`);
         }
 
         // Función para detener el sistema de timeout
@@ -573,27 +609,25 @@ app.get('/', (req: Request, res: Response) => {
             console.log('⏰ Sistema de timeout detenido');
         }
 
-        // Event listener para interceptar envío de mensajes
-        messageInput.addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') {
-                const message = messageInput.value.toLowerCase().trim();
-                
-                // Si es el primer mensaje (hola), iniciar timeout checking después de un pequeño delay
-                if (message === 'hola' || message === 'hi') {
-                    setTimeout(() => {
-                        startTimeoutChecking(currentPhone);
-                    }, 1000); // 1 segundo para que el mensaje se procese
-                }
-            }
-        });
+        // Event listener simplificado - la lógica de timeout está en sendMessage()
+        // messageInput.addEventListener('keypress', function(e) {
+        //     if (e.key === 'Enter') {
+        //         sendMessage(); // Ya se maneja arriba
+        //     }
+        // });
 
         // Botón para forzar timeout (solo para testing)
         const forceTimeoutBtn = document.createElement('button');
         forceTimeoutBtn.textContent = '🧪 Forzar Timeout (Testing)';
-        forceTimeoutBtn.className = 'mt-2 px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600';
+        forceTimeoutBtn.className = 'mt-2 mr-2 px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600';
+        
+        // Botón para testear polling manualmente
+        const testPollingBtn = document.createElement('button');
+        testPollingBtn.textContent = '🔍 Test Polling';
+        testPollingBtn.className = 'mt-2 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600';
         forceTimeoutBtn.onclick = async () => {
             if (!currentUserId) {
-                alert('Inicia una conversación primero');
+                alert('Inicia una conversación primero escribiendo "hola"');
                 return;
             }
             
@@ -603,10 +637,12 @@ app.get('/', (req: Request, res: Response) => {
                 });
                 const data = await response.json();
                 
-                if (data.success && data.message) {
-                    addResult('⏰ Timeout Forzado', { 
+                console.log('🧪 [FORCE-TIMEOUT] Respuesta:', data);
+                
+                if (data.message) {
+                    addResult('🧪 Timeout Forzado para Testing', { 
                         conversation: {
-                            user_message: '(Timeout automático)',
+                            user_message: '(timeout forzado manualmente)',
                             bot_response: data.message
                         }
                     }, 'chat');
@@ -614,13 +650,44 @@ app.get('/', (req: Request, res: Response) => {
                     stopTimeoutChecking();
                 }
             } catch (error) {
-                console.error('Error forzando timeout:', error);
+                console.error('🧪 [FORCE-TIMEOUT] Error:', error);
+                alert('Error forzando timeout: ' + error.message);
             }
         };
         
-        // Agregar botón debajo del input (con validación)
+        // Funcionalidad del botón de test polling
+        testPollingBtn.onclick = async () => {
+            const testPhone = currentUserId || currentPhone;
+            console.log(\`🔍 [TEST] Testeando polling manual para: \${testPhone}\`);
+            
+            try {
+                const response = await fetch(\`/check-timeout/\${testPhone}\`);
+                const data = await response.json();
+                
+                console.log('🔍 [TEST] Respuesta del endpoint:', data);
+                
+                addResult('🔍 Test Polling Manual', {
+                    phone: testPhone,
+                    endpoint: \`/check-timeout/\${testPhone}\`,
+                    response: data
+                });
+                
+                if (data.message) {
+                    alert(\`Mensaje encontrado: \${data.message.substring(0, 50)}...\`);
+                } else {
+                    alert('No hay mensajes pendientes');
+                }
+                
+            } catch (error) {
+                console.error('🔍 [TEST] Error:', error);
+                alert('Error testeando polling: ' + error.message);
+            }
+        };
+        
+        // Agregar botones debajo del input
         const inputContainer = document.querySelector('.border.rounded.p-4') || document.body;
         inputContainer.appendChild(forceTimeoutBtn);
+        inputContainer.appendChild(testPollingBtn);
         
         console.log('🧪 Sistema de timeout demo inicializado');
     </script>
@@ -721,6 +788,52 @@ app.post('/test-chat', async (req: Request, res: Response) => {
       error: 'Error en demo',
       details: error.message 
     })
+  }
+})
+
+// **ENDPOINT: Verificar timeouts pendientes (para polling automático)**
+app.get('/check-timeout/:phone', async (req: Request, res: Response) => {
+  try {
+    const { phone } = req.params
+
+    console.log(`🔍 [TIMEOUT-CHECK] Verificando timeouts para ${phone}`)
+
+    // Verificar cualquier mensaje pendiente usando el nuevo método
+    const result = await uniaccBot.checkForPendingMessage(phone)
+    
+    if (result.status !== 'active') {
+      console.log(`📱 [TIMEOUT-CHECK] Mensaje ${result.status} encontrado para ${phone}`)
+    }
+
+    return res.json({
+      status: result.status,
+      message: result.message,
+      timestamp: new Date().toISOString()
+    })
+
+  } catch (error: any) {
+    console.error('🔍 [TIMEOUT-CHECK] Error:', error)
+    return res.status(500).json({ error: error.message })
+  }
+})
+
+// **ENDPOINT: Forzar timeout para testing rápido**
+app.post('/force-timeout/:phone', async (req: Request, res: Response) => {
+  try {
+    const { phone } = req.params
+    const timeoutMessage = await uniaccBot.forceTimeout(phone)
+    
+    console.log(`🧪 [FORCE-TIMEOUT] Timeout forzado para ${phone}`)
+    
+    return res.json({
+      status: 'timeout_executed',
+      message: timeoutMessage,
+      phone,
+      timestamp: new Date().toISOString()
+    })
+  } catch (error: any) {
+    console.error('🧪 [FORCE-TIMEOUT] Error:', error)
+    return res.status(500).json({ error: error.message })
   }
 })
 
@@ -1173,11 +1286,12 @@ app.all('*', (req: Request, res: Response) => {
 // Inicializar servidor
 app.listen(PORT, () => {
   console.log(`🤖 UNIACC WhatsApp Bot iniciado`)
-  console.log(`🌐 Servidor corriendo en puerto ${PORT}`)
-  console.log(`📱 Webhook URL: http://localhost:${PORT}/webhook`)
-  console.log(`💚 Health check: http://localhost:${PORT}/health`)
-  console.log(`📊 Stats: http://localhost:${PORT}/stats`)
-  console.log(`⚡ Ambiente: ${process.env.NODE_ENV || 'development'}`)
+console.log(`🌐 Servidor corriendo en puerto ${PORT}`)
+console.log(`📱 Webhook URL: http://localhost:${PORT}/webhook`)
+console.log(`💚 Health check: http://localhost:${PORT}/health`)
+console.log(`📊 Stats: http://localhost:${PORT}/stats`)
+
+console.log(`⚡ Ambiente: ${process.env.NODE_ENV || 'development'}`)
   
   // Sincronizar fallbacks al inicio
   setTimeout(() => {

@@ -50,114 +50,6 @@ grant delete, insert, references, select, trigger, truncate, update on ejecutivo
 
 grant delete, insert, references, select, trigger, truncate, update on ejecutivos to service_role;
 
-create table prospectos
-(
-    id                    uuid                     default gen_random_uuid()        not null
-        primary key,
-    created_at            timestamp with time zone default now(),
-    updated_at            timestamp with time zone default now(),
-    nombre                text                                                      not null,
-    email                 text
-        constraint valid_email
-            check ((email ~ '^[^@]+@[^@]+\.[^@]+$'::text) OR (email IS NULL)),
-    telefono              text,
-    whatsapp              text                                                      not null
-        constraint valid_whatsapp
-            check (whatsapp ~ '^\+?[0-9]{8,15}$'::text),
-    edad                  integer,
-    ocupacion             text,
-    carrera_interes       text,
-    nivel_educacion       text,
-    experiencia_previa    text,
-    region                text,
-    ciudad                text,
-    pais                  text                     default 'Chile'::text,
-    estado                text                     default 'nuevo'::text
-        constraint prospectos_estado_check
-            check (estado = ANY
-                   (ARRAY ['nuevo'::text, 'contactado'::text, 'interesado'::text, 'matriculado'::text, 'descartado'::text])),
-    nivel_interes         text                     default 'medio'::text
-        constraint prospectos_nivel_interes_check
-            check (nivel_interes = ANY
-                   (ARRAY ['bajo'::text, 'medio'::text, 'alto'::text, 'muy_alto'::text, 'urgente'::text])),
-    assigned_to           uuid
-        references ejecutivos,
-    ejecutivo_asignado_at timestamp with time zone,
-    fuente                text                     default 'whatsapp_bot'::text
-        constraint prospectos_fuente_check
-            check (fuente = ANY
-                   (ARRAY ['whatsapp_bot'::text, 'web_form'::text, 'facebook_ads'::text, 'google_ads'::text, 'referido'::text, 'uniacc_chatbot'::text, 'demo_chatbot'::text, 'asesor_request'::text, 'timeout_session'::text])),
-    metadata              jsonb                    default '{}'::jsonb,
-    notas                 text,
-    tags                  text[],
-    ultimo_contacto       timestamp with time zone,
-    proximo_seguimiento   timestamp with time zone,
-    facultad_interes      text,
-    tipo_consulta         text                     default 'consulta_general'::text not null
-        constraint prospectos_tipo_consulta_check
-            check (tipo_consulta = ANY
-                   (ARRAY ['info_carreras'::text, 'info_admision'::text, 'info_costos'::text, 'info_modalidades'::text, 'solicitar_asesor'::text, 'ingreso solo datos basicos'::text, 'consulta multiple carrera especifica'::text, 'consulta multiple general'::text, 'captura en proceso'::text, 'abandono solo nombre'::text, 'abandono con email'::text, 'abandono con edad'::text, 'abandono con region'::text, 'abandono incompleto'::text, 'captura completa'::text]))
-);
-
-comment on column prospectos.tipo_consulta is 'Tipo de consulta específica según opción del menú: consulta carrera, consulta proceso admision, consulta costos y/o becas, consulta de modalidades de estudio, solicitud de asesor, consulta general. Las solicitudes de asesor se marcan como urgentes.';
-
-alter table prospectos
-    owner to postgres;
-
-create index idx_prospectos_whatsapp
-    on prospectos (whatsapp);
-
-create index idx_prospectos_email
-    on prospectos (email);
-
-create index idx_prospectos_estado
-    on prospectos (estado);
-
-create index idx_prospectos_asignado
-    on prospectos (assigned_to);
-
-create index idx_prospectos_fuente
-    on prospectos (fuente);
-
-create index idx_prospectos_carrera
-    on prospectos (carrera_interes);
-
-create index idx_prospectos_region
-    on prospectos (region);
-
-create index idx_prospectos_created_at
-    on prospectos (created_at);
-
-create index idx_prospectos_facultad_interes
-    on prospectos (facultad_interes);
-
-create index idx_prospectos_carrera_interes
-    on prospectos (carrera_interes);
-
-create index idx_prospectos_tipo_consulta
-    on prospectos (tipo_consulta);
-
-create index idx_prospectos_urgentes
-    on prospectos (tipo_consulta, nivel_interes, created_at)
-    where (tipo_consulta = 'solicitud de asesor'::text);
-
-create index idx_prospectos_reconocimiento
-    on prospectos (whatsapp asc, created_at desc);
-
-comment on index idx_prospectos_reconocimiento is 'Índice optimizado para consultas de reconocimiento de usuarios por WhatsApp y fecha.';
-
-create index idx_prospectos_dashboard_filters
-    on prospectos (estado asc, tipo_consulta asc, created_at desc);
-
-create index idx_prospectos_carrera_text_search
-    on prospectos using gin (to_tsvector('spanish'::regconfig, COALESCE(carrera_interes, ''::text)));
-
-grant delete, insert, references, select, trigger, truncate, update on prospectos to anon;
-
-grant delete, insert, references, select, trigger, truncate, update on prospectos to authenticated;
-
-grant delete, insert, references, select, trigger, truncate, update on prospectos to service_role;
-
 create table conversaciones
 (
     id              uuid                     default gen_random_uuid() not null
@@ -169,7 +61,7 @@ create table conversaciones
     phone_number    text                                               not null,
     contact_name    text,
     prospecto_id    uuid
-        references prospectos,
+        references ??? (),
     assigned_to     uuid
         references ejecutivos,
     status          text                     default 'active'::text
@@ -301,7 +193,7 @@ create table automatizacion_ejecuciones
         references automatizaciones
             on delete cascade,
     prospecto_id      uuid
-        references prospectos,
+        references ??? (),
     estado            text                     default 'pendiente'::text
         constraint automatizacion_ejecuciones_estado_check
             check (estado = ANY
@@ -389,8 +281,8 @@ create table leads_tracking
         primary key,
     created_at      timestamp with time zone default now(),
     prospecto_id    uuid
-        references prospectos
-            on delete cascade,
+        references ??? ()
+        on delete cascade,
     fuente_id       uuid
         references fuentes_leads,
     session_id      text,
@@ -434,92 +326,235 @@ grant delete, insert, references, select, trigger, truncate, update on leads_tra
 
 grant delete, insert, references, select, trigger, truncate, update on leads_tracking to service_role;
 
-create view ejecutivos_metrics
-            (id, nombre, email, prospectos_activos, tasa_conversion, total_prospectos, matriculados, prospectos_hoy) as
-SELECT e.id,
-       e.nombre,
-       e.email,
-       e.prospectos_activos,
-       e.tasa_conversion,
-       count(p.id)      AS total_prospectos,
-       count(
-               CASE
-                   WHEN p.estado = 'matriculado'::text THEN 1
-                   ELSE NULL::integer
-                   END) AS matriculados,
-       count(
-               CASE
-                   WHEN p.created_at >= CURRENT_DATE THEN 1
-                   ELSE NULL::integer
-                   END) AS prospectos_hoy
-FROM ejecutivos e
-         LEFT JOIN prospectos p ON e.id = p.assigned_to
-WHERE e.activo = true
-GROUP BY e.id, e.nombre, e.email, e.prospectos_activos, e.tasa_conversion;
+create table prospecto_actual
+(
+    whatsapp              text not null
+        primary key,
+    nombre                text not null,
+    email                 text,
+    telefono              text,
+    edad                  integer,
+    region                text,
+    ciudad                text,
+    pais                  text                     default 'Chile'::text,
+    carrera_interes       text                     default 'Sin especificar'::text,
+    facultad_interes      text                     default ''::text,
+    nivel_interes         text                     default 'medio'::text
+        constraint prospecto_actual_nivel_interes_check
+            check (nivel_interes = ANY
+                   (ARRAY ['bajo'::text, 'medio'::text, 'alto'::text, 'muy_alto'::text, 'urgente'::text])),
+    estado                text                     default 'nuevo'::text
+        constraint prospecto_actual_estado_check
+            check (estado = ANY
+                   (ARRAY ['nuevo'::text, 'contactado'::text, 'interesado'::text, 'matriculado'::text, 'descartado'::text])),
+    assigned_to           uuid
+        references ejecutivos,
+    ejecutivo_asignado_at timestamp with time zone,
+    ultimo_contacto       timestamp with time zone,
+    proximo_seguimiento   timestamp with time zone,
+    total_sesiones        integer                  default 1,
+    primera_interaccion   timestamp with time zone default now(),
+    ultima_interaccion    timestamp with time zone default now(),
+    tipo_consulta_actual  text,
+    perfil_usuario        text generated always as (
+        CASE
+            WHEN ((total_sesiones = 1) AND (tipo_consulta_actual ~~ 'abandono%'::text)) THEN 'abandono_inicial'::text
+            WHEN ((total_sesiones > 1) AND (tipo_consulta_actual !~~ 'abandono%'::text)) THEN 'reconvertido'::text
+            WHEN (total_sesiones > 3) THEN 'altamente_interesado'::text
+            WHEN (carrera_interes <> 'Sin especificar'::text) THEN 'interes_definido'::text
+            ELSE 'exploratorio'::text
+            END) stored,
+    es_prioritario        boolean generated always as (((total_sesiones > 2) OR (nivel_interes = ANY
+                                                                                 (ARRAY ['alto'::text, 'muy_alto'::text, 'urgente'::text])) OR
+                                                        (tipo_consulta_actual = 'solicitar_asesor'::text))) stored,
+    fuente                text                     default 'uniacc_chatbot'::text,
+    utm_source            text,
+    utm_campaign          text,
+    metadata              jsonb                    default '{}'::jsonb,
+    notas                 text,
+    tags                  text[],
+    created_at            timestamp with time zone default now(),
+    updated_at            timestamp with time zone default now()
+);
 
-alter table ejecutivos_metrics
+comment on table prospecto_actual is 'Estado actual de cada prospecto. Optimizada para consultas frecuentes del dashboard. 1 registro por WhatsApp.';
+
+alter table prospecto_actual
     owner to postgres;
 
-grant delete, insert, references, select, trigger, truncate, update on ejecutivos_metrics to anon;
+create index idx_actual_prioridad
+    on prospecto_actual (es_prioritario, nivel_interes, ultima_interaccion);
 
-grant delete, insert, references, select, trigger, truncate, update on ejecutivos_metrics to authenticated;
+create index idx_actual_perfil
+    on prospecto_actual (perfil_usuario, total_sesiones);
 
-grant delete, insert, references, select, trigger, truncate, update on ejecutivos_metrics to service_role;
+create index idx_actual_asignacion
+    on prospecto_actual (assigned_to, estado)
+    where (assigned_to IS NOT NULL);
 
-create view fuentes_metrics
-            (id, nombre, tipo, total_leads, leads_hoy, tasa_conversion, costo_por_lead, total_tracking_events,
-             conversiones) as
-SELECT f.id,
-       f.nombre,
-       f.tipo,
-       f.total_leads,
-       f.leads_hoy,
-       f.tasa_conversion,
-       f.costo_por_lead,
-       count(t.id)      AS total_tracking_events,
-       count(
-               CASE
-                   WHEN p.estado = 'matriculado'::text THEN 1
-                   ELSE NULL::integer
-                   END) AS conversiones
-FROM fuentes_leads f
-         LEFT JOIN leads_tracking t ON f.id = t.fuente_id
-         LEFT JOIN prospectos p ON t.prospecto_id = p.id
-WHERE f.activa = true
-GROUP BY f.id, f.nombre, f.tipo, f.total_leads, f.leads_hoy, f.tasa_conversion, f.costo_por_lead;
+create index idx_actual_seguimiento
+    on prospecto_actual (proximo_seguimiento)
+    where (proximo_seguimiento IS NOT NULL);
 
-alter table fuentes_metrics
+create index idx_actual_carrera
+    on prospecto_actual (carrera_interes, facultad_interes)
+    where (carrera_interes <> 'Sin especificar'::text);
+
+create index idx_actual_actividad
+    on prospecto_actual (ultima_interaccion desc);
+
+create index idx_actual_utm
+    on prospecto_actual (utm_source, utm_campaign)
+    where (utm_source IS NOT NULL);
+
+create table prospecto_historial
+(
+    id                      uuid                     default gen_random_uuid() not null
+        primary key,
+    whatsapp                text                                               not null
+        references prospecto_actual
+            on delete cascade,
+    sesion_numero           integer                                            not null,
+    tipo_consulta           text                                               not null,
+    nombre                  text                                               not null,
+    email                   text,
+    telefono                text,
+    edad                    integer,
+    region                  text,
+    carrera_interes         text                     default 'Sin especificar'::text,
+    facultad_interes        text                     default ''::text,
+    nivel_interes           text                     default 'medio'::text,
+    duracion_sesion         interval,
+    mensajes_intercambiados integer                  default 0,
+    flujo_completado        boolean                  default false,
+    razon_finalizacion      text                     default 'completado'::text
+        constraint prospecto_historial_razon_finalizacion_check
+            check (razon_finalizacion = ANY
+                   (ARRAY ['completado'::text, 'timeout'::text, 'abandono'::text, 'derivado_asesor'::text])),
+    paso_abandono           text,
+    datos_capturados        jsonb                    default '{}'::jsonb,
+    sesion_inicio           timestamp with time zone default now(),
+    sesion_fin              timestamp with time zone,
+    created_at              timestamp with time zone default now(),
+    fuente                  text                     default 'uniacc_chatbot'::text,
+    metadata                jsonb                    default '{}'::jsonb,
+    evolucion_interes       text generated always as (
+        CASE
+            WHEN ((carrera_interes <> 'Sin especificar'::text) AND (sesion_numero = 1)) THEN 'interes_inicial'::text
+            WHEN ((carrera_interes <> 'Sin especificar'::text) AND (sesion_numero > 1)) THEN 'definicion_interes'::text
+            WHEN ((tipo_consulta ~~ 'abandono%'::text) AND (sesion_numero = 1)) THEN 'abandono_inicial'::text
+            WHEN ((tipo_consulta !~~ 'abandono%'::text) AND (sesion_numero > 1)) THEN 'reconversion'::text
+            ELSE 'exploracion'::text
+            END) stored,
+    unique (whatsapp, sesion_numero)
+);
+
+comment on table prospecto_historial is 'Historial completo de todas las sesiones. Optimizada para analytics y reporting. Múltiples registros por WhatsApp.';
+
+alter table prospecto_historial
     owner to postgres;
 
-grant delete, insert, references, select, trigger, truncate, update on fuentes_metrics to anon;
+create index idx_historial_whatsapp_sesion
+    on prospecto_historial (whatsapp, sesion_numero);
 
-grant delete, insert, references, select, trigger, truncate, update on fuentes_metrics to authenticated;
+create index idx_historial_fecha
+    on prospecto_historial (created_at desc);
 
-grant delete, insert, references, select, trigger, truncate, update on fuentes_metrics to service_role;
+create index idx_historial_evolucion
+    on prospecto_historial (evolucion_interes, carrera_interes);
 
-create view usuarios_recurrentes
-            (whatsapp, nombre, email, carrera_interes, tipo_consulta, nivel_interes, created_at, recencia,
-             consulta_numero) as
+create index idx_historial_reconversion
+    on prospecto_historial (whatsapp, sesion_numero)
+    where (sesion_numero > 1);
+
+create index idx_historial_abandono
+    on prospecto_historial (razon_finalizacion, paso_abandono)
+    where (razon_finalizacion = ANY (ARRAY ['timeout'::text, 'abandono'::text]));
+
+create index idx_historial_tipo_consulta
+    on prospecto_historial (tipo_consulta, created_at);
+
+create index idx_historial_duracion
+    on prospecto_historial (duracion_sesion)
+    where (duracion_sesion IS NOT NULL);
+
+create view dashboard_prospectos
+            (whatsapp, nombre, email, telefono, carrera_interes, facultad_interes, nivel_interes, estado,
+             perfil_usuario, total_sesiones, es_prioritario, primera_interaccion, ultima_interaccion, assigned_to,
+             proximo_seguimiento, recencia, horas_engagement)
+as
 SELECT whatsapp,
        nombre,
        email,
+       telefono,
        carrera_interes,
-       tipo_consulta,
+       facultad_interes,
        nivel_interes,
-       created_at,
+       estado,
+       perfil_usuario,
+       total_sesiones,
+       es_prioritario,
+       primera_interaccion,
+       ultima_interaccion,
+       assigned_to,
+       proximo_seguimiento,
        CASE
-           WHEN created_at >= (now() - '7 days'::interval) THEN 'muy_reciente'::text
-           WHEN created_at >= (now() - '30 days'::interval) THEN 'reciente'::text
-           ELSE 'antiguo'::text
-           END                                                            AS recencia,
-       row_number() OVER (PARTITION BY whatsapp ORDER BY created_at DESC) AS consulta_numero
-FROM prospectos
-WHERE whatsapp IS NOT NULL
-ORDER BY whatsapp, created_at DESC;
+           WHEN ultima_interaccion >= (now() - '01:00:00'::interval) THEN 'muy_reciente'::text
+           WHEN ultima_interaccion >= (now() - '1 day'::interval) THEN 'reciente'::text
+           WHEN ultima_interaccion >= (now() - '7 days'::interval) THEN 'esta_semana'::text
+           ELSE 'antigua'::text
+           END                                                                      AS recencia,
+       EXTRACT(epoch FROM ultima_interaccion - primera_interaccion) / 3600::numeric AS horas_engagement
+FROM prospecto_actual
+ORDER BY es_prioritario DESC, ultima_interaccion DESC;
 
-comment on view usuarios_recurrentes is 'Vista optimizada para reconocimiento de usuarios recurrentes con información de recencia y número de consultas.';
+comment on view dashboard_prospectos is 'Vista optimizada para el dashboard principal con métricas pre-calculadas.';
 
-alter table usuarios_recurrentes
+alter table dashboard_prospectos
+    owner to postgres;
+
+create view analytics_reconversion
+            (fecha, nuevos_usuarios, usuarios_reconvertidos, tasa_reconversion_pct, promedio_sesiones_por_dia) as
+WITH stats_diarias AS (SELECT date_trunc('day'::text, prospecto_historial.created_at)       AS fecha,
+                              count(*) FILTER (WHERE prospecto_historial.sesion_numero = 1) AS nuevos_usuarios,
+                              count(*) FILTER (WHERE prospecto_historial.sesion_numero > 1) AS sesiones_reconversion,
+                              count(DISTINCT prospecto_historial.whatsapp)
+                              FILTER (WHERE prospecto_historial.sesion_numero > 1)          AS usuarios_reconvertidos,
+                              avg(prospecto_historial.sesion_numero)                        AS promedio_sesiones_por_dia
+                       FROM prospecto_historial
+                       WHERE prospecto_historial.created_at >= (CURRENT_DATE - '30 days'::interval)
+                       GROUP BY (date_trunc('day'::text, prospecto_historial.created_at)))
+SELECT fecha,
+       nuevos_usuarios,
+       usuarios_reconvertidos,
+       round(usuarios_reconvertidos::numeric * 100.0 / NULLIF(nuevos_usuarios, 0)::numeric, 2) AS tasa_reconversion_pct,
+       promedio_sesiones_por_dia
+FROM stats_diarias
+ORDER BY fecha DESC;
+
+comment on view analytics_reconversion is 'Vista de analytics con métricas de reconversión por día de los últimos 30 días.';
+
+alter table analytics_reconversion
+    owner to postgres;
+
+create view metricas_carreras
+            (carrera_interes, usuarios_unicos, total_consultas, promedio_sesiones_por_usuario, reconversiones,
+             duracion_promedio_sesion)
+as
+SELECT carrera_interes,
+       count(DISTINCT whatsapp)                                              AS usuarios_unicos,
+       count(*)                                                              AS total_consultas,
+       round(count(*)::numeric * 1.0 / count(DISTINCT whatsapp)::numeric, 2) AS promedio_sesiones_por_usuario,
+       count(*) FILTER (WHERE evolucion_interes = 'reconversion'::text)      AS reconversiones,
+       avg(duracion_sesion) FILTER (WHERE duracion_sesion IS NOT NULL)       AS duracion_promedio_sesion
+FROM prospecto_historial
+WHERE carrera_interes <> 'Sin especificar'::text
+  AND created_at >= (CURRENT_DATE - '30 days'::interval)
+GROUP BY carrera_interes
+HAVING count(DISTINCT whatsapp) >= 2
+ORDER BY (count(DISTINCT whatsapp)) DESC;
+
+alter table metricas_carreras
     owner to postgres;
 
 create function update_updated_at_column() returns trigger
@@ -540,12 +575,6 @@ create trigger update_ejecutivos_updated_at
     for each row
 execute procedure update_updated_at_column();
 
-create trigger update_prospectos_updated_at
-    before update
-    on prospectos
-    for each row
-execute procedure update_updated_at_column();
-
 create trigger update_conversaciones_updated_at
     before update
     on conversaciones
@@ -561,6 +590,12 @@ execute procedure update_updated_at_column();
 create trigger update_fuentes_updated_at
     before update
     on fuentes_leads
+    for each row
+execute procedure update_updated_at_column();
+
+create trigger update_prospecto_actual_updated_at
+    before update
+    on prospecto_actual
     for each row
 execute procedure update_updated_at_column();
 
@@ -602,12 +637,6 @@ END;
 $$;
 
 alter function update_ejecutivo_prospectos_count() owner to postgres;
-
-create trigger update_ejecutivo_count_trigger
-    after update
-    on prospectos
-    for each row
-execute procedure update_ejecutivo_prospectos_count();
 
 grant execute on function update_ejecutivo_prospectos_count() to anon;
 
@@ -658,12 +687,6 @@ END;
 $$;
 
 alter function update_fuente_stats() owner to postgres;
-
-create trigger update_fuente_stats_trigger
-    after insert or update
-    on prospectos
-    for each row
-execute procedure update_fuente_stats();
 
 grant execute on function update_fuente_stats() to anon;
 
@@ -726,115 +749,162 @@ $$;
 
 alter function get_prospectos_stats() owner to postgres;
 
-create function get_usuario_recurrente(p_whatsapp text, p_dias_limite integer DEFAULT 30)
-    returns TABLE(id uuid, nombre text, email text, carrera_interes text, tipo_consulta text, created_at timestamp with time zone, es_reciente boolean)
+create function sync_prospecto_actual() returns trigger
     language plpgsql
 as
 $$
 BEGIN
-  RETURN QUERY
-  SELECT
-    p.id,
-    p.nombre,
-    p.email,
-    p.carrera_interes,
-    p.tipo_consulta,
-    p.created_at,
-    (p.created_at >= NOW() - INTERVAL '1 day' * p_dias_limite) as es_reciente
-  FROM prospectos p
-  WHERE p.whatsapp = p_whatsapp
-  ORDER BY p.created_at DESC
-  LIMIT 1;
-END;
-$$;
-
-comment on function get_usuario_recurrente(text, integer) is 'Función para obtener información de usuarios recurrentes por WhatsApp. Usado para reconocimiento automático en múltiples consultas.';
-
-alter function get_usuario_recurrente(text, integer) owner to postgres;
-
-create function upsert_prospecto_por_whatsapp(p_whatsapp text, p_nombre text, p_email text DEFAULT NULL::text, p_telefono text DEFAULT NULL::text, p_carrera_interes text DEFAULT NULL::text, p_facultad_interes text DEFAULT NULL::text, p_tipo_consulta text DEFAULT 'consulta_general'::text, p_nivel_interes text DEFAULT 'alto'::text, p_fuente text DEFAULT 'uniacc_chatbot'::text, p_metadata jsonb DEFAULT '{}'::jsonb, p_horas_limite integer DEFAULT 24)
-    returns TABLE(prospecto_id uuid, es_nuevo boolean, mensaje text)
-    language plpgsql
-as
-$$
-DECLARE
-  existing_prospecto_id UUID;
-  new_prospecto_id UUID;
-BEGIN
-  -- Verificar si existe un prospecto reciente con el mismo WhatsApp
-  SELECT id INTO existing_prospecto_id
-  FROM prospectos
-  WHERE whatsapp = p_whatsapp
-    AND created_at >= NOW() - INTERVAL '1 hour' * p_horas_limite
-  ORDER BY created_at DESC
-  LIMIT 1;
-
-  -- Si existe un prospecto reciente, retornarlo
-  IF existing_prospecto_id IS NOT NULL THEN
-    RETURN QUERY SELECT
-      existing_prospecto_id,
-      false,
-      'Prospecto existente encontrado (anti-duplicados)'::text;
-    RETURN;
-  END IF;
-
-  -- Si no existe, crear nuevo prospecto
-  INSERT INTO prospectos (
-    nombre, email, telefono, whatsapp,
-    carrera_interes, facultad_interes, tipo_consulta,
-    nivel_interes, fuente, metadata
+  -- Insertar o actualizar en tabla principal automáticamente
+  INSERT INTO prospecto_actual (
+    whatsapp,
+    nombre,
+    email,
+    telefono,
+    edad,
+    region,
+    ciudad,
+    carrera_interes,
+    facultad_interes,
+    nivel_interes,
+    tipo_consulta_actual,
+    total_sesiones,
+    primera_interaccion,
+    ultima_interaccion,
+    fuente,
+    metadata
   ) VALUES (
-    p_nombre, p_email, p_telefono, p_whatsapp,
-    p_carrera_interes, p_facultad_interes, p_tipo_consulta,
-    p_nivel_interes, p_fuente, p_metadata
-  ) RETURNING id INTO new_prospecto_id;
-
-  RETURN QUERY SELECT
-    new_prospecto_id,
-    true,
-    'Nuevo prospecto creado exitosamente'::text;
-
-END;
-$$;
-
-comment on function upsert_prospecto_por_whatsapp(text, text, text, text, text, text, text, text, text, jsonb, integer) is 'Función anti-duplicados que crea nuevos prospectos solo si no existe uno reciente (24h por defecto) del mismo WhatsApp.';
-
-alter function upsert_prospecto_por_whatsapp(text, text, text, text, text, text, text, text, text, jsonb, integer) owner to postgres;
-
-create function update_prospecto_metadata() returns trigger
-    language plpgsql
-as
-$$
-BEGIN
-  -- Contar consultas previas del mismo usuario
-  NEW.metadata = NEW.metadata || jsonb_build_object(
-    'consultas_previas', (
-      SELECT COUNT(*)
-      FROM prospectos
-      WHERE whatsapp = NEW.whatsapp
-      AND created_at < NEW.created_at
-    ),
-    'es_usuario_recurrente', (
-      SELECT COUNT(*) > 0
-      FROM prospectos
-      WHERE whatsapp = NEW.whatsapp
-      AND created_at < NEW.created_at
-    ),
-    'ultima_actualizacion', NOW()
-  );
+    NEW.whatsapp,
+    NEW.nombre,
+    NEW.email,
+    NEW.telefono,
+    NEW.edad,
+    NEW.region,
+    NEW.ciudad,
+    NEW.carrera_interes,
+    NEW.facultad_interes,
+    NEW.nivel_interes,
+    NEW.tipo_consulta,
+    NEW.sesion_numero,
+    CASE WHEN NEW.sesion_numero = 1 THEN NEW.created_at
+         ELSE (SELECT MIN(created_at) FROM prospecto_historial WHERE whatsapp = NEW.whatsapp)
+    END,
+    NEW.created_at,
+    NEW.fuente,
+    NEW.metadata
+  )
+  ON CONFLICT (whatsapp) DO UPDATE SET
+    -- Solo actualizar si es la sesión más reciente
+    nombre = CASE WHEN EXCLUDED.total_sesiones >= prospecto_actual.total_sesiones
+                  THEN EXCLUDED.nombre ELSE prospecto_actual.nombre END,
+    email = COALESCE(EXCLUDED.email, prospecto_actual.email),
+    telefono = COALESCE(EXCLUDED.telefono, prospecto_actual.telefono),
+    edad = COALESCE(EXCLUDED.edad, prospecto_actual.edad),
+    region = COALESCE(EXCLUDED.region, prospecto_actual.region),
+    ciudad = COALESCE(EXCLUDED.ciudad, prospecto_actual.ciudad),
+    carrera_interes = CASE WHEN EXCLUDED.total_sesiones >= prospecto_actual.total_sesiones
+                           THEN EXCLUDED.carrera_interes ELSE prospecto_actual.carrera_interes END,
+    facultad_interes = CASE WHEN EXCLUDED.total_sesiones >= prospecto_actual.total_sesiones
+                            THEN EXCLUDED.facultad_interes ELSE prospecto_actual.facultad_interes END,
+    nivel_interes = CASE WHEN EXCLUDED.total_sesiones >= prospecto_actual.total_sesiones
+                         THEN EXCLUDED.nivel_interes ELSE prospecto_actual.nivel_interes END,
+    tipo_consulta_actual = CASE WHEN EXCLUDED.total_sesiones >= prospecto_actual.total_sesiones
+                                THEN EXCLUDED.tipo_consulta_actual ELSE prospecto_actual.tipo_consulta_actual END,
+    total_sesiones = EXCLUDED.total_sesiones,
+    ultima_interaccion = CASE WHEN EXCLUDED.ultima_interaccion > prospecto_actual.ultima_interaccion
+                              THEN EXCLUDED.ultima_interaccion ELSE prospecto_actual.ultima_interaccion END,
+    metadata = EXCLUDED.metadata,
+    updated_at = NOW();
 
   RETURN NEW;
 END;
 $$;
 
-alter function update_prospecto_metadata() owner to postgres;
+alter function sync_prospecto_actual() owner to postgres;
 
-create trigger trigger_update_prospecto_metadata
-    before insert
-    on prospectos
+create trigger trigger_sync_prospecto_actual
+    after insert
+    on prospecto_historial
     for each row
-execute procedure update_prospecto_metadata();
+execute procedure sync_prospecto_actual();
 
-comment on index idx_prospectos_reconocimiento is 'Índice optimizado para consultas de reconocimiento de usuarios por WhatsApp y fecha.';
-comment on view usuarios_recurrentes is 'Vista optimizada para reconocimiento de usuarios recurrentes con información de recencia y número de consultas.';
-comment on function get_usuario_recurrente(text, integer) is 'Función para obtener información de usuarios recurrentes por WhatsApp. Usado para reconocimiento automático en múltiples consultas.';
+create function insertar_sesion_prospecto(p_whatsapp text, p_nombre text, p_email text DEFAULT NULL::text, p_telefono text DEFAULT NULL::text, p_edad integer DEFAULT NULL::integer, p_region text DEFAULT NULL::text, p_carrera_interes text DEFAULT 'Sin especificar'::text, p_facultad_interes text DEFAULT ''::text, p_tipo_consulta text DEFAULT 'consulta_general'::text, p_nivel_interes text DEFAULT 'medio'::text, p_fuente text DEFAULT 'uniacc_chatbot'::text, p_datos_capturados jsonb DEFAULT '{}'::jsonb, p_duracion_sesion interval DEFAULT NULL::interval, p_mensajes integer DEFAULT 0, p_flujo_completado boolean DEFAULT false, p_razon_finalizacion text DEFAULT 'completado'::text, p_paso_abandono text DEFAULT NULL::text, p_metadata jsonb DEFAULT '{}'::jsonb)
+    returns TABLE(historial_id uuid, sesion_numero integer, es_nuevo_usuario boolean, perfil_usuario text)
+    language plpgsql
+as
+$$
+DECLARE
+  nuevo_sesion_numero INTEGER;
+  new_historial_id UUID;
+  es_nuevo BOOLEAN;
+  perfil TEXT;
+BEGIN
+  -- Verificar si es usuario nuevo
+  SELECT COUNT(*) = 0 INTO es_nuevo
+  FROM prospecto_historial
+  WHERE whatsapp = p_whatsapp;
+
+  -- Obtener siguiente número de sesión
+  SELECT COALESCE(MAX(sesion_numero), 0) + 1
+  INTO nuevo_sesion_numero
+  FROM prospecto_historial
+  WHERE whatsapp = p_whatsapp;
+
+  -- Determinar perfil del usuario
+  perfil := CASE
+    WHEN es_nuevo THEN 'nuevo'
+    WHEN nuevo_sesion_numero = 2 THEN 'recurrente_temprano'
+    WHEN nuevo_sesion_numero <= 5 THEN 'recurrente_medio'
+    ELSE 'recurrente_avanzado'
+  END;
+
+  -- Insertar SOLO en historial (sin trigger automático)
+  INSERT INTO prospecto_historial (
+    whatsapp,
+    nombre,
+    email,
+    telefono,
+    edad,
+    region,
+    carrera_interes,
+    facultad_interes,
+    tipo_consulta,
+    nivel_interes,
+    fuente,
+    datos_capturados,
+    sesion_numero,
+    duracion_sesion,
+    mensajes_intercambiados,
+    flujo_completado,
+    razon_finalizacion,
+    paso_abandono,
+    metadata
+  ) VALUES (
+    p_whatsapp,
+    p_nombre,
+    p_email,
+    p_telefono,
+    p_edad,
+    p_region,
+    p_carrera_interes,
+    p_facultad_interes,
+    p_tipo_consulta,
+    p_nivel_interes,
+    p_fuente,
+    p_datos_capturados,
+    nuevo_sesion_numero,
+    p_duracion_sesion,
+    p_mensajes,
+    p_flujo_completado,
+    p_razon_finalizacion,
+    p_paso_abandono,
+    p_metadata
+  ) RETURNING id INTO new_historial_id;
+
+  RETURN QUERY SELECT new_historial_id, nuevo_sesion_numero, es_nuevo, perfil;
+END;
+$$;
+
+comment on function insertar_sesion_prospecto(text, text, text, text, integer, text, text, text, text, text, text, jsonb, interval, integer, boolean, text, text, jsonb) is 'Función simplificada - solo inserta en historial, sin prospecto_actual automático.';
+
+alter function insertar_sesion_prospecto(text, text, text, text, integer, text, text, text, text, text, text, jsonb, interval, integer, boolean, text, text, jsonb) owner to postgres;
+

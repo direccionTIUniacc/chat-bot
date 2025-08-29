@@ -4,8 +4,12 @@
   "description": "Bot conversacional para WhatsApp Business API - UNIACC",
   "main": "dist/index.js",
   "scripts": {
-    "dev": "nodemon -r tsconfig-paths/register src/index.ts",
+    "dev": "concurrently \"nodemon -r tsconfig-paths/register src/index.ts\" \"npm run watch:frontend\"",
+    "dev:backend": "nodemon -r tsconfig-paths/register src/index.ts",
     "build": "tsc",
+    "build:frontend": "tsc -p tsconfig.frontend.json",
+    "build:all": "npm run build && npm run build:frontend",
+    "watch:frontend": "tsc -p tsconfig.frontend.json --watch",
     "start": "node dist/index.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
@@ -30,6 +34,7 @@
     "@types/cors": "^2.8.17",
     "@types/express": "^4.17.21",
     "@types/node": "^22.16.5",
+    "concurrently": "^9.2.1",
     "nodemon": "^3.1.10",
     "ts-node": "^10.9.2",
     "tsconfig-paths": "^4.2.0",

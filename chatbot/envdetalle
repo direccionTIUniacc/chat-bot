@@ -1,0 +1,31 @@
+# Botpress Configuration
+NODE_ENV=development
+BOT_PORT=3001
+BOT_HOST=localhost
+
+# WhatsApp Business API
+WHATSAPP_VERIFY_TOKEN=uniacc_verify_token_123
+WHATSAPP_ACCESS_TOKEN=tu_whatsapp_access_token
+WHATSAPP_PHONE_NUMBER_ID=tu_phone_number_id
+WHATSAPP_WEBHOOK_SECRET=tu_webhook_secret
+
+# Vue Dashboard Integration (para guardar prospectos) - LEGACY
+# VUE_WEBHOOK_URL=http://localhost:3002/api/botpress-webhook
+# VUE_WEBHOOK_SECRET=uniacc_webhook_secret_123
+
+# Supabase Database - NUEVA ARQUITECTURA DUAL
+VUE_WEBHOOK_URL=https://vtwdmyezyvhprwonengu.supabase.co/rest/v1
+VUE_WEBHOOK_SECRET=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ0d2RteWV6eXZocHJ3b25lbmd1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU4ODQ2MTQsImV4cCI6MjA3MTQ2MDYxNH0.iRICnZOws2yfMx514Cuyl5xZGDzrB5s6Bygtew5axZQ
+
+# Supabase Database (mantener para compatibilidad)
+SUPABASE_URL=https://vtwdmyezyvhprwonengu.supabase.co
+SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ0d2RteWV6eXZocHJ3b25lbmd1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU4ODQ2MTQsImV4cCI6MjA3MTQ2MDYxNH0.iRICnZOws2yfMx514Cuyl5xZGDzrB5s6Bygtew5axZQ
+
+# UNIACC Specific
+UNIACC_WEBSITE=https://www.uniacc.cl
+UNIACC_CONTACT_EMAIL=admision@uniacc.cl
+UNIACC_PHONE=+56226406000
+
+# Logging
+LOG_LEVEL=info
+LOG_FILE=logs/bot.log" >> .env

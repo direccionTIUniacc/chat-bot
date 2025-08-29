@@ -61,6 +61,14 @@ const routes: RouteRecordRaw[] = [
     meta: {
       title: 'Fuentes de Leads - UNIACC ChatBot'
     }
+  },
+  {
+    path: '/chat-demo',
+    name: 'ChatDemo',
+    component: () => import('@/views/ChatDemoView.vue'),
+    meta: {
+      title: 'Chat Demo - UNIACC ChatBot'
+    }
   }
 ]
 

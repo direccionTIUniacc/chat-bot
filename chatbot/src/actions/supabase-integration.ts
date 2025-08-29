@@ -31,26 +31,54 @@ export class SupabaseIntegration {
   async enviarProspecto(data: ProspectoData): Promise<{
     success: boolean
     prospectoId?: string
+    sesionNumero?: number
+    esNuevoUsuario?: boolean
+    perfilUsuario?: string
     error?: string
   }> {
     try {
-      console.log('📤 Enviando prospecto al dashboard:', data.email)
-      console.log('🔧 DEBUG - Webhook URL:', this.webhookUrl)
+      console.log('📤 [NUEVA BD] Guardando sesión para:', data.whatsapp)
+      console.log('🔧 DEBUG - Datos:', JSON.stringify(data, null, 2))
 
+      // 🎯 USAR NUEVA FUNCIÓN DE BD DIRECTAMENTE
       const payload = {
-        ...data,
-        timestamp: new Date().toISOString(),
-        canal: 'whatsapp_bot',
-        estado: 'nuevo'
+        p_whatsapp: data.whatsapp,
+        p_nombre: data.nombre,
+        p_email: data.email,
+        p_telefono: data.telefono,
+        p_edad: null, // TODO: agregar si tienes este dato
+        p_region: null, // TODO: agregar si tienes este dato  
+        p_carrera_interes: data.carrera_interes || 'Sin especificar',
+        p_facultad_interes: data.facultad_interes || '',
+        p_tipo_consulta: data.flujo_actual || data.tipo_consulta || 'consulta_general',
+        p_nivel_interes: data.nivel_interes || 'medio',
+        p_fuente: data.source || 'uniacc_chatbot',
+        p_datos_capturados: JSON.stringify({
+          nombre: data.nombre,
+          email: data.email,
+          telefono: data.telefono
+        }),
+        p_duracion_sesion: null, // TODO: calcular si tienes timestamp inicio
+        p_mensajes: 0, // TODO: contar mensajes si tienes contador
+        p_flujo_completado: !data.tipo_consulta?.includes('abandono'),
+        p_razon_finalizacion: data.tipo_consulta?.includes('abandono') ? 'timeout' : 'completado',
+        p_paso_abandono: data.tipo_consulta?.includes('abandono') ? data.tipo_consulta : null,
+        p_metadata: JSON.stringify({
+          bot_source: 'uniacc_direct',
+          timestamp: new Date().toISOString(),
+          ...data.datos_adicionales
+        })
       }
 
-      console.log('🔧 DEBUG - Payload enviado:', JSON.stringify(payload, null, 2))
+      console.log('🔧 DEBUG - Payload para función BD:', JSON.stringify(payload, null, 2))
       
-      const response = await axios.post(this.webhookUrl, payload, {
+      // 🎯 LLAMAR DIRECTAMENTE A LA FUNCIÓN DE BD
+      const response = await axios.post(`${this.webhookUrl}/rpc/insertar_sesion_prospecto`, payload, {
         headers: {
           'Content-Type': 'application/json',
+          'apikey': this.webhookSecret,
           'Authorization': `Bearer ${this.webhookSecret}`,
-          'User-Agent': 'UNIACC-WhatsApp-Bot/1.0'
+          'User-Agent': 'UNIACC-ChatBot-Direct/1.0'
         },
         timeout: 15000
       })
@@ -59,13 +87,19 @@ export class SupabaseIntegration {
       console.log('🔧 DEBUG - Response data:', JSON.stringify(response.data, null, 2))
 
       if (response.status === 200 || response.status === 201) {
-        console.log('✅ Prospecto guardado exitosamente')
+        const result = response.data
+        console.log(`✅ [NUEVA BD] Sesión guardada - Usuario: ${result.es_nuevo_usuario ? 'NUEVO' : 'RECURRENTE'}`)
+        console.log(`📊 [NUEVA BD] Sesión #${result.sesion_numero} - Perfil: ${result.perfil_usuario}`)
+        
         return {
           success: true,
-          prospectoId: response.data.prospecto_id || response.data.id
+          prospectoId: result.historial_id,
+          sesionNumero: result.sesion_numero,
+          esNuevoUsuario: result.es_nuevo_usuario,
+          perfilUsuario: result.perfil_usuario
         }
       } else {
-        console.error('❌ Error HTTP enviando prospecto:', response.status)
+        console.error('❌ Error HTTP llamando función BD:', response.status)
         return {
           success: false,
           error: `HTTP ${response.status}: ${response.statusText}`
@@ -73,7 +107,12 @@ export class SupabaseIntegration {
       }
 
     } catch (error: any) {
-      console.error('💥 Error crítico enviando prospecto:', error.message)
+      console.error('💥 Error crítico con nueva BD:', error.message)
+      if (error.response) {
+        console.error('🔧 DEBUG - Error status:', error.response.status)
+        console.error('🔧 DEBUG - Error data:', JSON.stringify(error.response.data, null, 2))
+        console.error('🔧 DEBUG - Error headers:', error.response.headers)
+      }
       
       // Intentar guardar en fallback local
       await this.guardarFallbackLocal(data)
@@ -110,6 +149,11 @@ export class SupabaseIntegration {
   }
 
   async registrarInteraccion(whatsapp: string, mensaje: string, respuesta: string): Promise<void> {
+    // TEMPORAL: Deshabilitado hasta crear tabla interacciones
+    console.log(`📊 [SKIP] Registro de interacción: ${whatsapp} - "${mensaje.substring(0, 20)}..."`)
+    return
+    
+    /*
     try {
       const payload = {
         whatsapp,
@@ -119,13 +163,13 @@ export class SupabaseIntegration {
         tipo: 'conversacion'
       }
 
-      // Enviar a endpoint de interacciones (si existe)
-      const interaccionUrl = this.webhookUrl.replace('/api/botpress-webhook', '/api/interacciones')
-      
-      await axios.post(interaccionUrl, payload, {
+      // Enviar a tabla interacciones en Supabase (si existe)
+      await axios.post(`${this.webhookUrl}/interacciones`, payload, {
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.webhookSecret}`
+          'apikey': this.webhookSecret,
+          'Authorization': `Bearer ${this.webhookSecret}`,
+          'User-Agent': 'UNIACC-ChatBot-Direct/1.0'
         },
         timeout: 10000
       })
@@ -136,6 +180,7 @@ export class SupabaseIntegration {
       // No es crítico si falla el registro de interacciones
       console.warn('⚠️ Error registrando interacción (no crítico):', error)
     }
+    */
   }
 
   async obtenerEjecutivoDisponible(regionId?: string): Promise<{

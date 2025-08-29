@@ -1,0 +1,113 @@
+{
+  "name": "Sistema de Timeout - Validación Completa",
+  "description": "Test del sistema de timeout con warning y timeout final",
+  "version": "1.0",
+  "author": "UNIACC Testing System",
+  "tags": ["timeout", "session-management", "progressive-capture"],
+  
+  "scenario": {
+    "user_id": "test_timeout_validation_001",
+    "whatsapp": "56912345999",
+    "expected_duration": "3-4 minutes",
+    "priority": "high",
+    
+    "prerequisite": {
+      "action": "cleanup_existing_data",
+      "whatsapp_numbers": ["56912345999"]
+    },
+    
+    "steps": [
+      {
+        "step": 1,
+        "action": "send_message",
+        "message": "hola",
+        "expected_response_contains": [
+          "¡Hola! 🎓 Soy el asistente virtual de UNIACC",
+          "¿Cuál es tu nombre completo?"
+        ],
+        "expected_state": "captura_inicial/solicitar_nombre"
+      },
+      {
+        "step": 2,
+        "action": "send_message",
+        "message": "Juan Timeout Test",
+        "expected_response_contains": [
+          "Perfecto Juan Timeout Test",
+          "¿Cuál es tu email?"
+        ],
+        "expected_state": "captura_inicial/solicitar_email",
+        "database_check": {
+          "table": "prospectos",
+          "conditions": {
+            "whatsapp": "56912345999",
+            "nombre": "Juan Timeout Test",
+            "tipo_consulta": "captura en proceso"
+          }
+        }
+      },
+      {
+        "step": 3,
+        "action": "wait_for_timeout_warning",
+        "timeout_seconds": 90,
+        "expected_warning_message_contains": [
+          "⏰ Juan Timeout Test, tu sesión caducará en 30 segundos",
+          "por inactividad"
+        ]
+      },
+      {
+        "step": 4,
+        "action": "wait_for_final_timeout",
+        "timeout_seconds": 30,
+        "expected_timeout_message_contains": [
+          "⏰ Juan Timeout Test, tu sesión ha finalizado por inactividad",
+          "📋 Hemos guardado tus datos para futuras consultas",
+          "💬 Escribe \"Hola\" para continuar explorando UNIACC"
+        ],
+        "expected_state": "session_reset"
+      },
+      {
+        "step": 5,
+        "action": "verify_data_saved",
+        "database_check": {
+          "table": "prospectos",
+          "conditions": {
+            "whatsapp": "56912345999",
+            "nombre": "Juan Timeout Test",
+            "tipo_consulta": "abandono con email",
+            "email": null
+          }
+        }
+      },
+      {
+        "step": 6,
+        "action": "send_message",
+        "message": "hola",
+        "expected_response_contains": [
+          "¡Hola de nuevo Juan Timeout Test!",
+          "Te reconocí por tu WhatsApp"
+        ],
+        "expected_state": "reconocimiento_usuario"
+      }
+    ],
+    
+    "success_criteria": [
+      "Warning se envía exactamente a los 90 segundos",
+      "Timeout final se ejecuta a los 120 segundos",
+      "Datos parciales se guardan con tipo 'abandono con email'",
+      "Usuario es reconocido en próxima sesión",
+      "Estado se resetea correctamente"
+    ],
+    
+    "testing_configuration": {
+      "timeout_warning_ms": 90000,
+      "timeout_final_ms": 120000,
+      "polling_interval_ms": 5000,
+      "max_test_duration_ms": 180000
+    },
+    
+    "cleanup": {
+      "delete_test_data": true,
+      "whatsapp_numbers": ["56912345999"]
+    }
+  }
+}

@@ -1,6 +1,20 @@
 import { FACULTADES_UNIACC, getFacultadById, getCarreraById, BECAS_UNIACC } from '../data/programas-uniacc'
 import { RESPUESTAS } from '../data/respuestas-predefinidas'
 import { SupabaseIntegration, ProspectoData } from './supabase-integration'
+import axios from 'axios'
+import { 
+  FLUJOS, 
+  PASOS, 
+  TIPOS_CONSULTA, 
+  NIVELES_INTERES,
+  FUENTES,
+  normalizarFlujo, 
+  normalizarPaso,
+  type Flujo,
+  type Paso,
+  type TipoConsulta,
+  type NivelInteres
+} from '../types/flow-types'
 
 export interface UsuarioState {
   flujo_actual: string | null
@@ -38,12 +52,23 @@ export interface UsuarioState {
 export class UniaccBot {
   private usuarios: Map<string, UsuarioState> = new Map()
   private supabaseIntegration: SupabaseIntegration
+  private webhookUrl: string
+  private webhookSecret: string
+  
+  // Sistema de mensajes pendientes para polling
+  private mensajesPendientes: Map<string, {
+    tipo: 'warning' | 'timeout'
+    mensaje: string
+    timestamp: Date
+  }> = new Map()
   
   // Constantes de timeout
   private readonly SESSION_TIMEOUT = 120000 // 2 minutos
   private readonly WARNING_TIMEOUT = 90000  // 1.5 minutos
 
   constructor(webhookUrl: string, webhookSecret: string) {
+    this.webhookUrl = webhookUrl
+    this.webhookSecret = webhookSecret
     this.supabaseIntegration = new SupabaseIntegration(webhookUrl, webhookSecret)
   }
 
@@ -91,39 +116,58 @@ export class UniaccBot {
       return this.iniciarConversacion(userId)
     }
 
-    // Procesar según el flujo actual
-    switch (state.flujo_actual) {
+    // 🎓 PROCESAMIENTO CON ESTÁNDAR UNIVERSITARIO - Con mapeo de compatibilidad
+    const flujoNormalizado = normalizarFlujo(state.flujo_actual!) || state.flujo_actual
+    
+    switch (flujoNormalizado) {
+      // ✅ Flujos migrados
+      case FLUJOS.PROSPECT_CAPTURE:
       case 'captura_inicial':
         return await this.procesarCapturaInicial(userId, mensaje)
-      
+        
+      case FLUJOS.ADVISOR_CONNECTION:
+        // 🎯 CAPTURA INTELIGENTE DE ASESOR
+        return await this.procesarCapturaAsesor(userId, mensaje)
+        
+      case 'captura_datos':
+        // 🔄 CAPTURA LEGACY 
+        return await this.procesarCapturaDatos(userId, textoLimpio)
+        
+      // 🔄 Flujos legacy (mantener compatibilidad)
       case 'menu_principal':
+      case FLUJOS.WELCOME:
         return await this.procesarMenuPrincipal(userId, textoLimpio)
       
       case 'exploracion_carreras':
+      case FLUJOS.PROGRAM_DISCOVERY:
         return this.procesarExploracionCarreras(userId, textoLimpio)
       
       case 'detalle_carrera':
+      case FLUJOS.CAREER_EXPLORATION:
         return await this.procesarDetalleCarrera(userId, textoLimpio)
       
-      case 'captura_datos':
-        return await this.procesarCapturaDatos(userId, textoLimpio)
-      
       case 'proceso_admision':
+      case FLUJOS.ADMISSION_INQUIRY:
         return await this.procesarProcesoAdmision(userId, textoLimpio)
       
       case 'busqueda_directa_carrera':
+      case FLUJOS.PROGRAM_DISCOVERY:
         return await this.procesarBusquedaDirectaCarrera(userId, textoLimpio)
       
       case 'costos_becas_decision':
+      case FLUJOS.FINANCIAL_INQUIRY:
         return await this.procesarCostosBecasDecision(userId, textoLimpio)
       
       case 'modalidades_decision':
+      case FLUJOS.PROGRAM_COMPARISON:
         return await this.procesarModalidadesDecision(userId, textoLimpio)
       
       case 'menu_contextual':
+      case FLUJOS.UNIVERSITY_DISCOVERY:
         return await this.procesarMenuContextual(userId, textoLimpio)
       
       default:
+        console.log(`⚠️ [FLOW] Flujo no reconocido: ${state.flujo_actual} → ${flujoNormalizado}`)
         return this.manejarNoEntendido(userId)
     }
   }
@@ -473,26 +517,35 @@ Escribe el nombre de la carrera que quieres estudiar (ejemplo: "Psicología", "A
     // Solo procesar respuestas numéricas para mayor simplicidad
     if (mensaje === '1') {
       await this.guardarProspectoFinalFlujo(userId, 'exploracion_carreras')
-      return `¡Excelente elección! 🎓 Nos pondremos en contacto contigo pronto con más información sobre esta carrera.
+      return `🎓 **¡Excelente elección!** Has tomado una gran decisión explorando esta carrera.
 
-✨ **¡Gracias por tu consulta!**
+📞 **Próximos pasos:**
+• Nuestro equipo académico se pondrá en contacto contigo
+• Recibirás información detallada del programa
+• Podrás resolver todas tus dudas específicas
 
-💬 **Escribe "Hola" para comenzar con una nueva consulta**`
+🌟 **Te acompañamos en tu camino hacia el éxito profesional.**
+
+💬 **Escribe "Hola" para realizar una nueva consulta**`
     }
 
     if (mensaje === '2') {
       await this.guardarProspectoFinalFlujo(userId, 'exploracion_carreras')
-      return `Entendido. 📚 Gracias por explorar nuestras opciones académicas.
+      return `📚 **Entendido.** Agradecemos que hayas explorado nuestras opciones académicas.
 
-✨ **¡Gracias por tu consulta!**
+💡 **Recuerda que siempre puedes volver para consultar sobre otras carreras o hablar con un asesor.**
 
-💬 **Escribe "Hola" para comenzar con una nueva consulta**`
+🎯 **UNIACC tiene múltiples caminos profesionales esperándote.**
+
+💬 **Escribe "Hola" para realizar una nueva consulta**`
     }
 
     if (mensaje === '3') {
+      // 🎓 MIGRACIÓN: Usar estándar universitario
       this.setUsuarioState(userId, {
-        flujo_actual: 'captura_datos',
-        paso_actual: 'nombre'
+        flujo_actual: FLUJOS.ADVISOR_CONNECTION,
+        paso_actual: PASOS.CONNECT_WITH_ADVISOR,
+        opcion_menu_seleccionada: 'hablar_asesor'
       })
       return await this.iniciarCapturaDatos(userId)
     }
@@ -581,19 +634,24 @@ Escribe el nombre de la carrera que quieres estudiar (ejemplo: "Psicología", "A
     // Manejo simplificado con opciones numéricas directas
     if (mensaje === '1') {
       await this.guardarProspectoFinalFlujo(userId, 'proceso_admision')
-      return `¡Perfecto! 🎓 Ya tienes toda la información para postular.
+      return `🎓 **¡Excelente!** Ya tienes toda la información necesaria sobre nuestro proceso de admisión 2025.
 
-🚀 **¡Comienza tu proceso cuando estés listo!**
+📋 **Próximos pasos:**
+• Revisa los requisitos específicos de tu carrera
+• Prepara tu documentación
+• Inicia tu postulación cuando estés listo
 
-✨ **¡Gracias por tu consulta!**
+🌟 **Te esperamos en UNIACC para ser parte de tu futuro profesional.**
 
-💬 **Escribe "Hola" para comenzar con una nueva consulta**`
+💬 **Escribe "Hola" para realizar una nueva consulta**`
     }
 
     if (mensaje === '2') {
+      // 🎓 MIGRACIÓN: Usar estándar universitario
       this.setUsuarioState(userId, {
-        flujo_actual: 'captura_datos',
-        paso_actual: 'nombre'
+        flujo_actual: FLUJOS.ADVISOR_CONNECTION,
+        paso_actual: PASOS.CONNECT_WITH_ADVISOR,
+        opcion_menu_seleccionada: 'hablar_asesor'
       })
       return await this.iniciarCapturaDatos(userId)
     }
@@ -691,9 +749,11 @@ Escribe el nombre de la carrera que quieres estudiar (ejemplo: "Psicología", "A
     }
 
     if (mensaje === '2') {
+      // 🎓 MIGRACIÓN: Usar estándar universitario
       this.setUsuarioState(userId, {
-        flujo_actual: 'captura_datos',
-        paso_actual: 'nombre'
+        flujo_actual: FLUJOS.ADVISOR_CONNECTION,
+        paso_actual: PASOS.CONNECT_WITH_ADVISOR,
+        opcion_menu_seleccionada: 'hablar_asesor'
       })
       return await this.iniciarCapturaDatos(userId)
     }
@@ -711,13 +771,24 @@ Escribe el nombre de la carrera que quieres estudiar (ejemplo: "Psicología", "A
   private async procesarCostosBecasDecision(userId: string, mensaje: string): Promise<string> {
     if (mensaje === '1') {
       await this.guardarProspectoFinalFlujo(userId, 'costos_becas')
-      return `¡Perfecto! 💰 Esperamos que la información sobre costos y becas te haya sido útil.\n\n✨ **¡Gracias por tu consulta!**\n\n💬 **Escribe "Hola" para comenzar con una nueva consulta**`
+      return `💰 **¡Perfecto!** Esperamos que la información sobre costos y becas te sea de gran utilidad.
+
+📊 **Recuerda que UNIACC ofrece:**
+• Múltiples opciones de financiamiento
+• Becas de excelencia académica
+• Convenios con instituciones financieras
+
+🎯 **Tu educación es una inversión en tu futuro profesional.**
+
+💬 **Escribe "Hola" para realizar una nueva consulta**`
     }
 
     if (mensaje === '2') {
+      // 🎓 MIGRACIÓN: Usar estándar universitario
       this.setUsuarioState(userId, {
-        flujo_actual: 'captura_datos',
-        paso_actual: 'nombre'
+        flujo_actual: FLUJOS.ADVISOR_CONNECTION,
+        paso_actual: PASOS.CONNECT_WITH_ADVISOR,
+        opcion_menu_seleccionada: 'hablar_asesor'
       })
       return await this.iniciarCapturaDatos(userId)
     }
@@ -732,7 +803,11 @@ Escribe el nombre de la carrera que quieres estudiar (ejemplo: "Psicología", "A
 
     if (mensaje === '4') {
       await this.guardarProspectoFinalFlujo(userId, 'costos_becas')
-      return `¡Excelente! 💰 Nos da mucho gusto haberte ayudado.\n\n✨ **¡Gracias por tu consulta!**\n\n💬 **Escribe "Hola" para comenzar con una nueva consulta**`
+      return `💰 **¡Excelente!** Nos alegra haberte proporcionado la información que necesitabas.
+
+🎓 **UNIACC: Donde tu futuro profesional comienza.**
+
+💬 **Escribe "Hola" para realizar una nueva consulta**`
     }
 
     return `**Elige una opción:**\n\n1️⃣ Sí, quiero más información\n2️⃣ Hablar con un asesor sobre becas\n3️⃣ Ver qué carreras hay\n4️⃣ Ya tengo la info que necesitaba\n\n**Escribe solo el número (1, 2, 3 o 4):**`
@@ -741,25 +816,51 @@ Escribe el nombre de la carrera que quieres estudiar (ejemplo: "Psicología", "A
   private async procesarModalidadesDecision(userId: string, mensaje: string): Promise<string> {
     if (mensaje === '1') {
       await this.guardarProspectoFinalFlujo(userId, 'modalidades_estudio')
-      return `¡Perfecto! 🏢 La modalidad presencial es ideal para networking y máxima interacción.\n\n✨ **¡Gracias por tu consulta!**\n\n💬 **Escribe "Hola" para comenzar con una nueva consulta**`
+      return `🏢 **¡Excelente elección!** La modalidad presencial te permitirá:
+
+✨ **Beneficios del campus presencial:**
+• Networking directo con compañeros y profesores
+• Acceso completo a laboratorios y bibliotecas
+• Experiencia universitaria integral
+• Actividades extracurriculares y eventos
+
+🎓 **Te esperamos en nuestro campus para vivir la experiencia UNIACC.**
+
+💬 **Escribe "Hola" para realizar una nueva consulta**`
     }
 
     if (mensaje === '2') {
       await this.guardarProspectoFinalFlujo(userId, 'modalidades_estudio')
-      return `¡Excelente elección! 💻 La modalidad semipresencial te da la flexibilidad que necesitas.\n\n✨ **¡Gracias por tu consulta!**\n\n💬 **Escribe "Hola" para comenzar con una nueva consulta**`
+      return `💻 **¡Excelente elección!** La modalidad semipresencial te ofrece:
+
+🔄 **Flexibilidad inteligente:**
+• Clases presenciales estratégicas para networking
+• Contenido digital de alta calidad
+• Compatibilidad con horarios laborales
+• Apoyo académico personalizado
+
+⚖️ **El equilibrio perfecto entre autonomía y acompañamiento académico.**
+
+💬 **Escribe "Hola" para realizar una nueva consulta**`
     }
 
     if (mensaje === '3') {
+      // 🎓 MIGRACIÓN: Usar estándar universitario
       this.setUsuarioState(userId, {
-        flujo_actual: 'captura_datos',
-        paso_actual: 'nombre'
+        flujo_actual: FLUJOS.ADVISOR_CONNECTION,
+        paso_actual: PASOS.CONNECT_WITH_ADVISOR,
+        opcion_menu_seleccionada: 'hablar_asesor'
       })
       return await this.iniciarCapturaDatos(userId)
     }
 
     if (mensaje === '4') {
       await this.guardarProspectoFinalFlujo(userId, 'modalidades_estudio')
-      return `¡Genial! 🎆 Esperamos que la información sobre modalidades te haya sido útil.\n\n✨ **¡Gracias por tu consulta!**\n\n💬 **Escribe "Hola" para comenzar con una nueva consulta**`
+      return `📚 **¡Genial!** Esperamos que la información sobre nuestras modalidades te haya sido de gran utilidad.
+
+🎯 **UNIACC se adapta a tu estilo de vida para que logres tus metas académicas.**
+
+💬 **Escribe "Hola" para realizar una nueva consulta**`
     }
 
     return `**Elige una modalidad:**\n\n1️⃣ Presencial - Máxima interacción\n2️⃣ Semipresencial - Flexibilidad\n3️⃣ Hablar con un asesor\n4️⃣ Ya tengo la info que necesitaba\n\n**Escribe solo el número (1, 2, 3 o 4):**`
@@ -767,31 +868,34 @@ Escribe el nombre de la carrera que quieres estudiar (ejemplo: "Psicología", "A
 
   private async verificarUsuarioExistente(userId: string): Promise<any | null> {
     try {
-      // Buscar usuario en base de datos por WhatsApp
-      const response = await fetch(`http://localhost:3002/api/prospectos?whatsapp=${userId}`, {
-        method: 'GET',
+      console.log(`🔍 [VERIFICAR] Buscando usuario ${userId} en prospecto_actual...`)
+      
+      // Buscar usuario en prospecto_actual por WhatsApp usando Supabase directo
+      const response = await axios.get(`${this.webhookUrl}/prospecto_actual?whatsapp=eq.${userId}`, {
         headers: {
-          'Content-Type': 'application/json'
-        }
+          'Content-Type': 'application/json',
+          'apikey': this.webhookSecret,
+          'Authorization': `Bearer ${this.webhookSecret}`,
+          'User-Agent': 'UNIACC-ChatBot-Direct/1.0'
+        },
+        timeout: 10000
       })
       
-      if (!response.ok) {
+      if (response.status !== 200 || !response.data || response.data.length === 0) {
+        console.log(`🆕 [VERIFICAR] Usuario nuevo: ${userId}`)
         return null
       }
       
-      const data = await response.json() as any
-      if (!data.success || !data.data || data.data.length === 0) {
-        return null
-      }
-      
-      const usuario = data.data[0] // Último prospecto
+      const usuario = response.data[0]
+      console.log(`✅ [VERIFICAR] Usuario existente encontrado: ${usuario.nombre} - ${usuario.total_sesiones} sesiones`)
       
       // Verificar que no sea muy antigua (más de 30 días)
-      const fechaConsulta = new Date(usuario.created_at)
+      const fechaConsulta = new Date(usuario.ultima_interaccion)
       const ahora = new Date()
       const diasDiferencia = (ahora.getTime() - fechaConsulta.getTime()) / (1000 * 60 * 60 * 24)
       
       if (diasDiferencia > 30) {
+        console.log(`⏰ [VERIFICAR] Usuario muy antiguo (${Math.round(diasDiferencia)} días), tratando como nuevo`)
         return null // Muy antigua, tratar como nuevo usuario
       }
       
@@ -875,7 +979,7 @@ Escribe el nombre de la carrera que quieres estudiar (ejemplo: "Psicología", "A
     }
     
     // Para usuarios con historial de carrera específica
-    if (state.ultima_carrera_consultada) {
+    if (state.ultima_carrera_consultada && state.ultima_carrera_consultada !== 'Sin especificar') {
       if (mensaje === '1') {
         // Más info sobre carrera anterior
         const carrera = this.buscarCarreraPorNombre(state.ultima_carrera_consultada)
@@ -1113,10 +1217,188 @@ Escribe el nombre de la carrera que quieres estudiar (ejemplo: "Psicología", "A
     const state = this.getUsuarioState(userId)
     const datos = state.datos_prospecto
 
-    // Si ya tenemos los datos básicos del usuario, finalizar directamente
-    if (datos.nombre && datos.email && datos.telefono) {
-      console.log(`✅ Usuario ${userId} ya tiene datos completos, finalizando solicitud de asesor`)
+    // 🧠 CAPTURA INTELIGENTE - Evaluar qué datos tenemos y cuáles faltan
+    const datosCompletos = await this.evaluarDatosExistentes(userId, state)
+    
+    // Si tenemos todos los datos necesarios, finalizar directamente
+    if (datosCompletos.nombre && datosCompletos.email && datosCompletos.telefono) {
+      console.log(`✅ Usuario ${userId} ya tiene todos los datos necesarios, finalizando solicitud de asesor`)
+      return await this.finalizarSolicitudAsesor(userId, datosCompletos, state)
+    }
+    
+    // Si faltan datos, iniciar captura inteligente desde el campo faltante
+    return await this.iniciarCapturaInteligente(userId, datosCompletos, state)
+  }
+
+  // 🧠 MÉTODOS DE CAPTURA INTELIGENTE
+
+  private async evaluarDatosExistentes(userId: string, state: any): Promise<any> {
+    let datos = {
+      nombre: state.datos_prospecto.nombre || null,
+      email: state.datos_prospecto.email || null,
+      telefono: state.datos_prospecto.telefono || null,
+      edad: state.datos_prospecto.edad || null,
+      region: state.datos_prospecto.region || null,
+      carrera_interes: state.datos_prospecto.carrera_interes || null
+    }
+
+    // Si es usuario recurrente, verificar datos en BD
+    if (state.es_usuario_recurrente) {
+      const usuarioExistente = await this.verificarUsuarioExistente(userId)
       
+      if (usuarioExistente) {
+        console.log(`🔍 Evaluando datos existentes para usuario recurrente ${userId}`)
+        
+        // Combinar datos del estado con datos de BD (prioridad a datos más recientes)
+        datos = {
+          nombre: datos.nombre || usuarioExistente.nombre,
+          email: datos.email || usuarioExistente.email,
+          telefono: datos.telefono || usuarioExistente.telefono,
+          edad: datos.edad || usuarioExistente.edad,
+          region: datos.region || usuarioExistente.region,
+          carrera_interes: datos.carrera_interes || usuarioExistente.carrera_interes
+        }
+        
+        console.log(`📊 Datos consolidados:`, {
+          nombre: datos.nombre ? '✅' : '❌',
+          email: datos.email ? '✅' : '❌',
+          telefono: datos.telefono ? '✅' : '❌',
+          edad: datos.edad ? '✅' : '❌',
+          region: datos.region ? '✅' : '❌'
+        })
+      }
+    }
+
+    return datos
+  }
+
+  // 🎯 MÉTODO ESPECÍFICO PARA CAPTURA DE ASESOR
+  private async procesarCapturaAsesor(userId: string, mensaje: string): Promise<string> {
+    const state = this.getUsuarioState(userId)
+    
+    // Según el paso actual, procesar la respuesta
+    switch (state.paso_actual) {
+      case PASOS.COLLECT_BASIC_INFO:
+        // Si está pidiendo nombre
+        if (!state.datos_prospecto.nombre) {
+          if (mensaje.length >= 2) {
+            this.setUsuarioState(userId, {
+              datos_prospecto: { ...state.datos_prospecto, nombre: mensaje }
+            })
+            
+            // Evaluar datos y continuar inteligentemente
+            const datosCompletos = await this.evaluarDatosExistentes(userId, this.getUsuarioState(userId))
+            return await this.iniciarCapturaInteligente(userId, datosCompletos, this.getUsuarioState(userId))
+          } else {
+            return 'Por favor, ingresa tu nombre completo (mínimo 2 caracteres)'
+          }
+        }
+        
+        // Si está pidiendo email
+        if (!state.datos_prospecto.email) {
+          if (this.validarEmail(mensaje)) {
+            this.setUsuarioState(userId, {
+              datos_prospecto: { ...state.datos_prospecto, email: mensaje }
+            })
+            
+            // Evaluar datos y continuar inteligentemente
+            const datosCompletos = await this.evaluarDatosExistentes(userId, this.getUsuarioState(userId))
+            return await this.iniciarCapturaInteligente(userId, datosCompletos, this.getUsuarioState(userId))
+          } else {
+            return '📧 Por favor ingresa un email válido (debe contener @ y .)'
+          }
+        }
+        break
+        
+      case PASOS.COLLECT_CONTACT_PREFERENCES:
+        // Pidiendo teléfono
+        const telefonoLimpio = mensaje.replace(/\s/g, '')
+        if (telefonoLimpio.length < 8) {
+          return '📱 Por favor ingresa un número de teléfono válido (mínimo 8 dígitos)'
+        }
+        
+        this.setUsuarioState(userId, {
+          datos_prospecto: { ...state.datos_prospecto, telefono: mensaje }
+        })
+        
+        // Finalizar con todos los datos
+        const datosCompletos = await this.evaluarDatosExistentes(userId, this.getUsuarioState(userId))
+        return await this.finalizarSolicitudAsesor(userId, datosCompletos, this.getUsuarioState(userId))
+        
+      default:
+        // Si no está en un paso específico, evaluar datos y continuar
+        const datosActuales = await this.evaluarDatosExistentes(userId, state)
+        return await this.iniciarCapturaInteligente(userId, datosActuales, state)
+    }
+    
+    return 'Ha ocurrido un error. Escribe "hola" para reiniciar.'
+  }
+
+  private async iniciarCapturaInteligente(userId: string, datos: any, state: any): Promise<string> {
+    // 🎓 CAPTURA INTELIGENTE CON ESTÁNDAR UNIVERSITARIO
+    
+    if (!datos.nombre) {
+      this.setUsuarioState(userId, {
+        flujo_actual: FLUJOS.PROSPECT_CAPTURE,
+        paso_actual: PASOS.COLLECT_BASIC_INFO,
+        opcion_menu_seleccionada: 'hablar_asesor'
+      })
+      return `🎓 **Conectemos contigo con un Asesor Académico Especializado**
+
+Nuestros asesores están capacitados para ayudarte con:
+• 🎯 Orientación vocacional personalizada
+• 📋 Proceso de admisión y requisitos
+• 💰 Becas y financiamiento disponible
+• 🏫 Visitas al campus e instalaciones
+
+👤 Para comenzar, ¿cuál es tu **nombre completo**?`
+    }
+    
+    if (!datos.email) {
+      this.setUsuarioState(userId, {
+        flujo_actual: FLUJOS.PROSPECT_CAPTURE,
+        paso_actual: PASOS.COLLECT_BASIC_INFO,
+        opcion_menu_seleccionada: 'hablar_asesor',
+        datos_prospecto: {
+          ...state.datos_prospecto,
+          ...datos
+        }
+      })
+      return `👋 **¡Hola ${datos.nombre}! Un placer conocerte**
+
+Para que nuestro **Asesor Académico** pueda enviarte información personalizada y programar una llamada:
+
+📧 ¿Cuál es tu **email de contacto**?
+
+💡 *Recibirás información exclusiva sobre UNIACC y tus programas de interés*`
+    }
+    
+    if (!datos.telefono) {
+      this.setUsuarioState(userId, {
+        flujo_actual: FLUJOS.PROSPECT_CAPTURE,
+        paso_actual: PASOS.COLLECT_CONTACT_PREFERENCES,
+        opcion_menu_seleccionada: 'hablar_asesor',
+        datos_prospecto: {
+          ...state.datos_prospecto,
+          ...datos
+        }
+      })
+      return `✅ **Perfecto ${datos.nombre}!**
+
+📧 Email registrado: ${datos.email}
+
+Para finalizar tu **solicitud de asesoramiento académico**:
+
+📱 ¿Cuál es tu **número de teléfono**?
+
+🎯 *Nuestro asesor se comunicará contigo en las próximas 24 horas*`
+    }
+    
+    // Si llegamos aquí, todos los datos están completos
+    return await this.finalizarSolicitudAsesor(userId, datos, state)
+  }
+
+  private async finalizarSolicitudAsesor(userId: string, datos: any, state: any): Promise<string> {
       // Obtener información de facultad y carrera si están disponibles
       let facultadInfo = ''
       let carreraInfo = ''
@@ -1148,23 +1430,23 @@ Escribe el nombre de la carrera que quieres estudiar (ejemplo: "Psicología", "A
           whatsapp: userId,
           edad: datos.edad,
           region: datos.region,
-          carrera_interes: carreraInfo,
+        carrera_interes: carreraInfo || datos.carrera_interes,
           facultad_interes: facultadInfo,
-          source: 'asesor_request',
+        nivel_interes: NIVELES_INTERES.ALTO, // Alto porque solicita asesor
+        tipo_consulta: TIPOS_CONSULTA.SOLICITUD_ASESOR,
+        source: FUENTES.UNIACC_CHATBOT,
           flujo_actual: state.opcion_menu_seleccionada || 'hablar_asesor'
         }
 
         console.log('📋 Guardando solicitud de asesor para:', datos.nombre)
-        console.log('🔧 Estado al guardar:', JSON.stringify({
-          opcion_menu_seleccionada: state.opcion_menu_seleccionada,
-          flujo_actual: prospectoData.flujo_actual
-        }, null, 2))
+      console.log('🔧 Datos completos enviados:', JSON.stringify(prospectoData, null, 2))
+
         const resultado = await this.supabaseIntegration.enviarProspecto(prospectoData)
         
         if (resultado.success) {
           console.log('✅ Solicitud de asesor guardada exitosamente:', resultado.prospectoId)
           
-          // Resetear usuario después de guardar exitosamente para permitir nueva consulta
+        // Resetear usuario después de guardar exitosamente
           this.resetUsuario(userId)
           console.log(`🔄 Usuario ${userId} reseteado para nueva consulta`)
         }
@@ -1172,46 +1454,45 @@ Escribe el nombre de la carrera que quieres estudiar (ejemplo: "Psicología", "A
         console.error('💥 Error guardando solicitud de asesor:', error)
       }
 
-      // Mantener en menu principal en lugar de resetear
+    // Mantener en menu principal
       this.setUsuarioState(userId, {
         flujo_actual: 'menu_principal',
         paso_actual: null
       })
 
-      return `✅ **¡Perfecto, ${datos.nombre}!**
+      return `🎉 **¡Solicitud de Asesoramiento Académico Confirmada!**
 
-📧 Email: ${datos.email}
-📱 Teléfono: ${datos.telefono}
-${datos.edad ? `🎂 Edad: ${datos.edad} años` : ''}
-${datos.region ? `📍 Región: ${datos.region}` : ''}
-${carreraInfo ? `🎓 Interés: ${carreraInfo}` : facultadInfo ? `🏫 Facultad: ${facultadInfo}` : ''}
+✅ **Datos de contacto registrados:**
+👤 **Nombre:** ${datos.nombre}
+📧 **Email:** ${datos.email}
+📱 **Teléfono:** ${datos.telefono}
+${datos.edad ? `🎂 **Edad:** ${datos.edad} años` : ''}
+${datos.region ? `📍 **Región:** ${datos.region}` : ''}
+${carreraInfo ? `🎓 **Programa de Interés:** ${carreraInfo}` : facultadInfo ? `🏫 **Facultad de Interés:** ${facultadInfo}` : datos.carrera_interes && datos.carrera_interes !== 'Sin especificar' ? `🎓 **Área de Interés:** ${datos.carrera_interes}` : ''}
 
-**Un asesor especializado te contactará en las próximas 24 horas** para brindarte información personalizada sobre:
-${carreraInfo ? `• **${carreraInfo}** - Detalles específicos de la carrera` : ''}
-${facultadInfo && !carreraInfo ? `• **${facultadInfo}** - Carreras disponibles` : ''}
-• Proceso de admisión y requisitos
-• Becas y financiamiento disponibles
-• Modalidades de estudio y horarios
-• Visitas al campus y facilidades
+---
 
-**¡Gracias por tu interés en UNIACC!** 🎓✨
+📞 **Tu Asesor Académico Personal te contactará en las próximas 24 horas**
 
-*Universidad de Artes, Ciencias y Comunicaciones*
+🎯 **Recibirás información especializada sobre:**
+${carreraInfo ? `• **${carreraInfo}** - Plan de estudios, campo laboral y oportunidades` : ''}
+${facultadInfo && !carreraInfo ? `• **${facultadInfo}** - Programas académicos disponibles` : ''}
+• 📚 **Proceso de Admisión 2025** - Requisitos y fechas importantes
+• 💰 **Becas y Financiamiento** - Opciones personalizadas según tu perfil
+• 🏫 **Campus y Modalidades** - Presencial, online y semipresencial
+• 🚀 **Oportunidades de Práctica** - Convenios con empresas líderes
 
-💬 **Escribe "Hola" para comenzar con una nueva consulta**`
+🌟 **¿Sabías que UNIACC es pionera en Comunicación Audiovisual en Chile?**
+
+**¡Gracias por confiar en nosotros para tu futuro académico!** 🎓✨
+
+*UNIACC - Universidad de Artes, Ciencias y Comunicaciones*
+*"Bienvenidos a Crear"*
+
+💬 **Escribe "Hola" para realizar una nueva consulta**`
     }
 
-    // Si no tenemos datos completos, iniciar captura normal
-    return `📝 **Para brindarte la mejor atención personalizada**
 
-Un asesor especializado te contactará para:
-• Resolver todas tus dudas
-• Procesos de admisión y becas  
-• Visitas al campus
-• Información detallada de carreras
-
-👤 ¿Cuál es tu **nombre completo**?`
-  }
 
   private async finalizarCapturaDatos(userId: string): Promise<string> {
     const state = this.getUsuarioState(userId)
@@ -1432,6 +1713,12 @@ Escribe el número de tu opción 📝`
     const state = this.getUsuarioState(userId)
     const datos = state.datos_prospecto
     
+    // 🔄 PARA USUARIOS RECURRENTES: Usar datos de BD si no están en estado temporal
+    if (state.es_usuario_recurrente && (!datos.nombre || !datos.email)) {
+      console.log('🔄 Usuario recurrente detectado, recuperando datos de BD...')
+      return await this.guardarProspectoRecurrente(userId, tipoConsulta)
+    }
+    
     // Solo guardar si tenemos los datos mínimos
     if (!datos.nombre || !datos.email || !datos.telefono) {
       console.log('⚠️ No se puede guardar prospecto, faltan datos básicos')
@@ -1488,6 +1775,73 @@ Escribe el número de tu opción 📝`
       }
     } catch (error) {
       console.error(`💥 Error al guardar prospecto para flujo ${tipoConsulta}:`, error)
+    }
+  }
+
+  // 🔄 MÉTODO ESPECÍFICO PARA USUARIOS RECURRENTES
+  private async guardarProspectoRecurrente(userId: string, tipoConsulta: string) {
+    try {
+      const state = this.getUsuarioState(userId)
+      
+      // Buscar datos del usuario en BD
+      const usuarioExistente = await this.verificarUsuarioExistente(userId)
+      if (!usuarioExistente) {
+        console.log('⚠️ No se encontraron datos del usuario recurrente en BD')
+        return
+      }
+
+      // Obtener nombres legibles para facultad y carrera ACTUAL
+      let facultadNombre = 'Sin especificar'
+      let carreraNombre = 'Sin especificar'
+      
+      if (state.facultad_seleccionada) {
+        const facultad = getFacultadById(state.facultad_seleccionada)
+        if (facultad) {
+          facultadNombre = facultad.nombre
+        }
+      }
+      
+      if (state.carrera_seleccionada && state.facultad_seleccionada) {
+        const carrera = getCarreraById(state.facultad_seleccionada, state.carrera_seleccionada)
+        if (carrera) {
+          carreraNombre = carrera.nombre
+          console.log(`🎓 Carrera seleccionada en esta sesión: ${carreraNombre}`)
+        }
+      }
+
+      const prospectoData: ProspectoData = {
+        nombre: usuarioExistente.nombre,
+        email: usuarioExistente.email,
+        telefono: usuarioExistente.telefono,
+        whatsapp: userId,
+        edad: usuarioExistente.edad,
+        region: usuarioExistente.region,
+        carrera_interes: carreraNombre, // 🎯 ACTUALIZAR con carrera actual
+        facultad_interes: facultadNombre, // 🎯 ACTUALIZAR con facultad actual
+        nivel_interes: NIVELES_INTERES.ALTO, // Usuario recurrente que expresa interés
+        tipo_consulta: tipoConsulta,
+        source: FUENTES.UNIACC_CHATBOT,
+        flujo_actual: tipoConsulta
+      }
+
+      console.log(`💾 [RECURRENTE] Guardando prospecto para ${usuarioExistente.nombre}`)
+      console.log(`🎓 [RECURRENTE] Nueva carrera de interés: ${carreraNombre}`)
+      console.log('🔍 DEBUG - ProspectoData recurrente:', JSON.stringify(prospectoData, null, 2))
+      
+      const resultado = await this.supabaseIntegration.enviarProspecto(prospectoData)
+      
+      if (resultado.success) {
+        console.log(`✅ [RECURRENTE] Prospecto actualizado con nueva carrera: ${carreraNombre}`)
+        
+        // Resetear usuario después de guardar exitosamente
+        this.resetUsuario(userId)
+        console.log(`🔄 [RECURRENTE] Usuario ${userId} reseteado para nueva consulta`)
+      } else {
+        console.error('❌ [RECURRENTE] Error actualizando prospecto:', resultado.error)
+      }
+      
+    } catch (error) {
+      console.error('💥 Error guardando prospecto recurrente:', error)
     }
   }
 
@@ -1624,6 +1978,13 @@ Escribe el número de tu opción 📝`
     
     console.log(`⏰ Warning generado para ${userId}: ${warningMessage}`)
     
+    // Guardar mensaje para polling del frontend
+    this.mensajesPendientes.set(userId, {
+      tipo: 'warning',
+      mensaje: warningMessage,
+      timestamp: new Date()
+    })
+    
     // TODO: Implementar envío por WhatsApp para producción
     // try {
     //   const { WhatsAppSender } = await import('../utils/whatsapp-sender')
@@ -1667,6 +2028,13 @@ Escribe el número de tu opción 📝`
     const timeoutMessage = this.generateTimeoutMessage(state, dataSaved)
     
     console.log(`⏰ Timeout message generado para ${userId}: ${timeoutMessage}`)
+    
+    // Guardar mensaje para polling del frontend
+    this.mensajesPendientes.set(userId, {
+      tipo: 'timeout',
+      mensaje: timeoutMessage,
+      timestamp: new Date()
+    })
     
     // TODO: Implementar envío por WhatsApp para producción
     // try {
@@ -1797,11 +2165,13 @@ Un asesor podrá contactarte cuando lo necesites.
 
   // Verificar si hay pending timeout warning para mostrar en interfaz
   async checkForTimeoutWarning(userId: string): Promise<string | null> {
-    const state = this.getUsuarioState(userId)
+    const mensajePendiente = this.mensajesPendientes.get(userId)
     
-    // Si hay warning pendiente y no se ha enviado, enviarlo
-    if (state.warning_timeout_id && !state.timeout_warning_sent) {
-      return await this.sendWarningMessage(userId)
+    if (mensajePendiente && mensajePendiente.tipo === 'warning') {
+      // Remover mensaje después de recuperarlo
+      this.mensajesPendientes.delete(userId)
+      console.log(`📱 [POLLING] Warning recuperado para ${userId}`)
+      return mensajePendiente.mensaje
     }
     
     return null
@@ -1809,16 +2179,42 @@ Un asesor podrá contactarte cuando lo necesites.
 
   // Verificar si hay pending timeout final para mostrar en interfaz
   async checkForSessionTimeout(userId: string): Promise<string | null> {
-    const state = this.getUsuarioState(userId)
+    const mensajePendiente = this.mensajesPendientes.get(userId)
     
-    // Solo para verificación manual desde interfaz
-    // Los timeouts reales se manejan automáticamente
+    if (mensajePendiente && mensajePendiente.tipo === 'timeout') {
+      // Remover mensaje después de recuperarlo
+      this.mensajesPendientes.delete(userId)
+      console.log(`📱 [POLLING] Timeout final recuperado para ${userId}`)
+      return mensajePendiente.mensaje
+    }
+    
     return null
   }
 
   // Método para forzar timeout desde interfaz (para testing)
   async forceTimeout(userId: string): Promise<string> {
     return await this.handleSessionTimeout(userId)
+  }
+
+  // Verificar cualquier mensaje pendiente (warning o timeout)
+  async checkForPendingMessage(userId: string): Promise<{ status: 'warning' | 'timeout' | 'active', message: string | null }> {
+    const mensajePendiente = this.mensajesPendientes.get(userId)
+    
+    if (mensajePendiente) {
+      // Remover mensaje después de recuperarlo
+      this.mensajesPendientes.delete(userId)
+      console.log(`📱 [POLLING] Mensaje ${mensajePendiente.tipo} recuperado para ${userId}`)
+      
+      return {
+        status: mensajePendiente.tipo,
+        message: mensajePendiente.mensaje
+      }
+    }
+    
+    return {
+      status: 'active',
+      message: null
+    }
   }
 
 }

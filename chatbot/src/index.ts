@@ -6,6 +6,7 @@ import { UniaccBot } from './actions/uniacc-scripts'
 import { WhatsAppSender } from './utils/whatsapp-sender'
 import { emailValidator, phoneValidator, nameValidator } from './utils/validators'
 import { SupabaseIntegration } from './actions/supabase-integration'
+import logger from './utils/enhanced-logger'
 
 // Cargar variables de entorno
 dotenv.config()
@@ -730,15 +731,116 @@ app.get('/health', async (req: Request, res: Response) => {
 
 // **ENDPOINT: Estadísticas del bot**
 app.get('/stats', (req: Request, res: Response) => {
-  // En una implementación real, esto vendría de una base de datos
-  res.status(200).json({
-    usuarios_activos: 0, // Implementar contador real
-    mensajes_procesados: 0, // Implementar contador real
-    prospectos_capturados: 0, // Implementar contador real
+  try {
+    const totalUsuarios = uniaccBot.getUsuarios().size
+    const logStats = logger.getActivitySummary()
+    
+    res.json({
+      bot: 'UNIACC WhatsApp Bot',
+      status: 'Activo',
+      timestamp: new Date().toISOString(),
+      metrics: {
+        usuarios_activos: totalUsuarios,
     uptime: process.uptime(),
-    memoria_uso: process.memoryUsage(),
-    timestamp: new Date().toISOString()
-  })
+        memoria_uso: process.memoryUsage()
+      },
+      logs: logStats
+    })
+  } catch (error) {
+    console.error('Error obteniendo estadísticas:', error)
+    res.status(500).json({ error: 'Error interno del servidor' })
+  }
+})
+
+// 📋 ENDPOINTS DE LOGGING Y DEBUGGING
+app.get('/logs', (req: Request, res: Response) => {
+  try {
+    const { user, category, level, limit = 50, format = 'json' } = req.query
+    
+    let logs
+    
+    if (user) {
+      logs = logger.getLogsByUser(user as string, parseInt(limit as string))
+    } else if (category) {
+      logs = logger.getLogsByCategory(category as any, parseInt(limit as string))
+    } else if (level === 'error') {
+      logs = logger.getErrorLogs(parseInt(limit as string))
+    } else {
+      logs = logger.exportLogs(format as 'json' | 'csv')
+    }
+    
+    if (format === 'csv') {
+      res.setHeader('Content-Type', 'text/csv')
+      res.setHeader('Content-Disposition', 'attachment; filename=logs.csv')
+      return res.send(logs)
+    }
+    
+    res.json({
+      total: Array.isArray(logs) ? logs.length : 'N/A',
+      logs: logs,
+      activity: logger.getActivitySummary()
+    })
+    
+  } catch (error) {
+    console.error('Error obteniendo logs:', error)
+    res.status(500).json({ error: 'Error interno del servidor' })
+  }
+})
+
+// 🎯 ENDPOINT DE TESTING COMPLETO
+app.get('/testing', (req: Request, res: Response) => {
+  try {
+    const flowsData = {
+      "menu_principal": {
+        "opciones": ["1", "2", "3", "4", "5", "6"],
+        "descripcion": "Menú para usuarios nuevos y sin carrera específica"
+      },
+      "menu_contextual": {
+        "con_carrera": {
+          "opciones": ["1", "2", "3", "4", "5", "6"],
+          "descripcion": "Menú para usuarios recurrentes con carrera consultada"
+        },
+        "sin_carrera": {
+          "opciones": ["1", "2", "3", "4", "5", "6"],
+          "descripcion": "Menú para usuarios recurrentes sin carrera específica"
+        }
+      },
+      "exploracion_carreras": {
+        "facultades": ["A", "B", "C", "D", "E"],
+        "carreras_por_facultad": "Variable según facultad",
+        "detalle_carrera": ["1", "2", "3", "4"]
+      },
+      "advisor_connection": {
+        "datos_requeridos": ["nombre", "email", "telefono"],
+        "captura_inteligente": "Solo pide datos faltantes"
+      },
+      "timeout_system": {
+        "warning_time": "1.5 minutos",
+        "final_timeout": "2 minutos",
+        "data_saved": "Prospecto guardado en BD"
+      }
+    }
+    
+    const testingChecklist = [
+      { test: "Usuario nuevo - hola", status: "pending" },
+      { test: "Usuario recurrente - reconocimiento", status: "pending" },
+      { test: "Explorar carreras - A-E", status: "pending" },
+      { test: "Flujo asesor - datos faltantes", status: "critical" },
+      { test: "Timeout - warning + final", status: "pending" },
+      { test: "Base de datos - guardado", status: "pending" }
+    ]
+    
+    res.json({
+      flows: flowsData,
+      testing: testingChecklist,
+      logs: logger.getActivitySummary(),
+      documentation: "Ver flujo.md para detalles completos"
+    })
+    
+  } catch (error) {
+    console.error('Error en testing endpoint:', error)
+    res.status(500).json({ error: 'Error interno del servidor' })
+  }
 })
 
 // **ENDPOINT: Chat de prueba (MVP/Demo)**
@@ -1286,23 +1388,26 @@ app.all('*', (req: Request, res: Response) => {
 // Inicializar servidor
 app.listen(PORT, () => {
   console.log(`🤖 UNIACC WhatsApp Bot iniciado`)
-console.log(`🌐 Servidor corriendo en puerto ${PORT}`)
-console.log(`📱 Webhook URL: http://localhost:${PORT}/webhook`)
-console.log(`💚 Health check: http://localhost:${PORT}/health`)
-console.log(`📊 Stats: http://localhost:${PORT}/stats`)
+  console.log(`🌐 Servidor corriendo en puerto ${PORT}`)
+  console.log(`📱 Webhook URL: http://localhost:${PORT}/webhook`)
+  console.log(`💚 Health check: http://localhost:${PORT}/health`)
+  console.log(`📊 Stats: http://localhost:${PORT}/stats`)
+console.log(`📋 Logs: http://localhost:${PORT}/logs`)
+console.log(`🎯 Testing: http://localhost:${PORT}/testing`)
 
-console.log(`⚡ Ambiente: ${process.env.NODE_ENV || 'development'}`)
+  console.log(`⚡ Ambiente: ${process.env.NODE_ENV || 'development'}`)
   
-  // Sincronizar fallbacks al inicio
-  setTimeout(() => {
-    supabaseIntegration.sincronizarFallbacks()
-      .then(count => {
-        if (count > 0) {
-          console.log(`🔄 Sincronizados ${count} prospectos pendientes`)
-        }
-      })
-      .catch(error => console.error('Error inicial sincronizando:', error))
-  }, 5000)
+  // SINCRONIZACIÓN DE FALLBACKS DESHABILITADA
+  console.log('📄 [FALLBACK] Sincronización automática deshabilitada')
+  // setTimeout(() => {
+  //   supabaseIntegration.sincronizarFallbacks()
+  //     .then(count => {
+  //       if (count > 0) {
+  //         console.log(`🔄 Sincronizados ${count} prospectos pendientes`)
+  //       }
+  //     })
+  //     .catch(error => console.error('Error inicial sincronizando:', error))
+  // }, 5000)
 })
 
 // Manejo de señales de cierre

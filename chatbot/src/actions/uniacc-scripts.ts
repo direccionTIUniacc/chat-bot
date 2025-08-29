@@ -2,6 +2,8 @@ import { FACULTADES_UNIACC, getFacultadById, getCarreraById, BECAS_UNIACC } from
 import { RESPUESTAS } from '../data/respuestas-predefinidas'
 import { SupabaseIntegration, ProspectoData } from './supabase-integration'
 import axios from 'axios'
+import logger, { LogCategory } from '../utils/enhanced-logger'
+import { detectPhoneFromUserId, generatePhoneConfirmationMessage, formatToE164 } from '../utils/phone-formatter'
 import { 
   FLUJOS, 
   PASOS, 
@@ -23,7 +25,10 @@ export interface UsuarioState {
   datos_prospecto: {
     nombre?: string
     email?: string
-    telefono?: string
+    telefono?: string | null
+    telefono_detectado?: string
+    telefono_confirmado?: boolean
+    whatsapp?: string
     edad?: number
     region?: string
     carrera_interes?: string
@@ -84,6 +89,225 @@ export class UniaccBot {
     return this.usuarios.get(userId)!
   }
 
+  // Método público para obtener mapa de usuarios (para debugging/stats)
+  getUsuarios() {
+    return this.usuarios
+  }
+
+  /**
+   * 📱 Procesar confirmación de teléfono (nuevo flujo estándar mundial)
+   */
+  private async procesarConfirmacionTelefono(userId: string, mensaje: string): Promise<string> {
+    const state = this.getUsuarioState(userId)
+    const numeroDetectado = state.datos_prospecto?.telefono_detectado
+    
+    // 📊 LOG: Procesando confirmación
+    logger.logMessageProcessing(userId, mensaje, 'captura_inicial', 'confirmar_telefono')
+    
+    switch (mensaje.trim()) {
+      case '1': {
+        // ✅ Usuario confirma usar el número detectado
+        this.setUsuarioState(userId, {
+          datos_prospecto: {
+            ...state.datos_prospecto,
+            telefono: numeroDetectado,
+            whatsapp: numeroDetectado,
+            telefono_confirmado: true
+          },
+          paso_actual: 'solicitar_nombre'
+        })
+        
+        // 📊 LOG: Teléfono confirmado
+        logger.logProspectData(userId, 'telefono_confirmado', { phone: numeroDetectado }, true)
+        
+        // 💾 GUARDAR INMEDIATAMENTE EL TELÉFONO EN BD
+        if (numeroDetectado) {
+          await this.crearProspectoConTelefono(userId, numeroDetectado)
+        }
+        
+        return `✅ **¡Perfecto!** Usaremos ${numeroDetectado} para contactarte.
+
+🎓 Para personalizar tu experiencia en UNIACC:
+
+👤 ¿Cuál es tu **nombre completo**?`
+      }
+      
+      case '2': {
+        // 📱 Usuario prefiere dar otro número
+        this.setUsuarioState(userId, {
+          paso_actual: 'solicitar_telefono_manual'
+        })
+        
+        return `📱 Por favor, escribe tu **número de contacto preferido**:
+
+Ejemplo: +56912345678 o 912345678
+
+💡 Lo usaremos para enviarte información y conectarte con asesores`
+      }
+      
+      case '3': {
+        // 🚫 Usuario prefiere continuar sin guardar número
+        this.setUsuarioState(userId, {
+          datos_prospecto: {
+            ...state.datos_prospecto,
+            telefono: null,
+            telefono_confirmado: false
+          },
+          paso_actual: 'solicitar_nombre'
+        })
+        
+        // 📊 LOG: Usuario optó por no usar teléfono
+        logger.logProspectData(userId, 'telefono_rechazado', { reason: 'usuario_eligio_privacidad' }, true)
+        
+        return `✅ **Entendido.** Continuaremos sin guardar tu número.
+
+🎓 Para brindarte información sobre UNIACC:
+
+👤 ¿Cuál es tu **nombre completo**?`
+      }
+      
+      default: {
+        // ❓ Opción no válida
+        return `❓ Por favor, selecciona una opción válida:
+
+1️⃣ Sí, usar ${numeroDetectado} para contactarme
+2️⃣ Prefiero dar otro número  
+3️⃣ Continuar sin guardar número
+
+Escribe **solo el número** de tu opción (1, 2 o 3)`
+      }
+    }
+  }
+
+  /**
+   * 📱 Crear prospecto inmediatamente con teléfono confirmado
+   */
+  private async crearProspectoConTelefono(userId: string, telefono: string): Promise<void> {
+    try {
+      const datos: ProspectoData = {
+        nombre: 'Usuario WhatsApp', // Temporal hasta que dé el nombre
+        email: null,
+        telefono: telefono,
+        whatsapp: userId,
+        edad: undefined,
+        region: undefined,
+        carrera_interes: 'Sin especificar',
+        facultad_interes: '',
+        nivel_interes: 'medio',
+        tipo_consulta: 'telefono_confirmado',
+        source: 'uniacc_chatbot',
+        flujo_actual: 'captura_inicial'
+      }
+
+      console.log(`💾 Creando prospecto inicial con teléfono: ${telefono}`)
+      
+      const resultado = await this.supabaseIntegration.enviarProspecto(datos)
+      
+      if (resultado.success) {
+        console.log(`✅ Prospecto con teléfono creado exitosamente: ${resultado.prospectoId}`)
+        
+        // Guardar ID del prospecto en el estado
+        this.setUsuarioState(userId, {
+          prospecto_id: resultado.prospectoId
+        })
+        
+        // 📊 LOG: Prospecto creado con teléfono
+        logger.logProspectData(userId, 'prospecto_telefono_creado', {
+          prospectoId: resultado.prospectoId,
+          telefono: telefono
+        }, true)
+      } else {
+        console.warn(`⚠️ Error creando prospecto con teléfono: ${resultado.error}`)
+      }
+      
+    } catch (error: any) {
+      console.error(`💥 Error crítico creando prospecto con teléfono:`, error.message)
+    }
+  }
+
+  /**
+   * ✅ Finalizar captura cuando teléfono ya está confirmado
+   */
+  private async finalizarCapturaConTelefonoConfirmado(userId: string, regionSeleccionada: string): Promise<string> {
+    const state = this.getUsuarioState(userId)
+    const datos = state.datos_prospecto
+    
+    // 📊 LOG: Finalizando con teléfono pre-confirmado
+    logger.logProspectData(userId, 'captura_completa_telefono_confirmado', datos, true)
+    
+    // Completar captura en base de datos
+    const resultado = await this.finalizarCapturaDatos(userId)
+    
+    return `🎉 **¡PERFECTO ${datos?.nombre?.toUpperCase()}!**
+
+📋 **Tus datos:**
+👤 ${datos?.nombre}
+📧 ${datos?.email}
+🎂 ${datos?.edad} años
+📍 ${regionSeleccionada}
+📱 ${datos?.telefono} ✅
+
+✅ **Datos guardados exitosamente**
+
+---
+
+🌟 **¡Bienvenid@ a UNIACC!** 🌟
+*Universidad de Artes, Ciencias y Comunicaciones*
+
+¿En qué puedo ayudarte hoy?
+
+1️⃣ **Conocer nuestras carreras**
+2️⃣ **Proceso de admisión 2025**
+3️⃣ **Costos y becas**
+4️⃣ **Modalidades de estudio**
+5️⃣ **Hablar con un asesor**
+
+Escribe el número de tu opción 📝`
+  }
+
+  /**
+   * 📱 Procesar teléfono manual cuando usuario eligió opción 2
+   */
+  private async procesarTelefonoManual(userId: string, mensaje: string): Promise<string> {
+    const phoneValidation = formatToE164(mensaje)
+    
+    if (phoneValidation.isValid) {
+      // ✅ Número válido
+      const state = this.getUsuarioState(userId)
+      this.setUsuarioState(userId, {
+        datos_prospecto: {
+          ...state.datos_prospecto,
+          telefono: phoneValidation.formatted,
+          whatsapp: phoneValidation.formatted,
+          telefono_confirmado: true
+        },
+        paso_actual: 'solicitar_nombre'
+      })
+      
+      // 📊 LOG: Teléfono manual guardado
+      logger.logProspectData(userId, 'telefono_manual', { phone: phoneValidation.formatted }, true)
+      
+      // 💾 GUARDAR INMEDIATAMENTE EL TELÉFONO EN BD
+      await this.crearProspectoConTelefono(userId, phoneValidation.formatted!)
+      
+      return `✅ **¡Perfecto!** Usaremos ${phoneValidation.formatted} para contactarte.
+
+🎓 Para personalizar tu experiencia en UNIACC:
+
+👤 ¿Cuál es tu **nombre completo**?`
+    } else {
+      // ❌ Número inválido
+      return `❌ **Número no válido.** Por favor, verifica el formato:
+
+**Ejemplos válidos:**
+• +56912345678 (con código país)
+• 912345678 (móvil chileno)
+• 56912345678 (código país sin +)
+
+📱 Escribe tu número nuevamente:`
+    }
+  }
+
   private setUsuarioState(userId: string, state: Partial<UsuarioState>) {
     const currentState = this.getUsuarioState(userId)
     this.usuarios.set(userId, { ...currentState, ...state })
@@ -106,6 +330,9 @@ export class UniaccBot {
     const state = this.getUsuarioState(userId)
     const textoLimpio = mensaje.toLowerCase().trim()
 
+    // 📊 LOG EXTENDIDO: Procesamiento de mensaje
+    logger.logMessageProcessing(userId, mensaje, state.flujo_actual || 'none', state.paso_actual || 'none')
+
     console.log(`🤖 [${userId}] Procesando: "${mensaje}" | Estado: ${state.flujo_actual}/${state.paso_actual}`)
 
     // Configurar timeout para esta sesión
@@ -124,7 +351,7 @@ export class UniaccBot {
       case FLUJOS.PROSPECT_CAPTURE:
       case 'captura_inicial':
         return await this.procesarCapturaInicial(userId, mensaje)
-        
+      
       case FLUJOS.ADVISOR_CONNECTION:
         // 🎯 CAPTURA INTELIGENTE DE ASESOR
         return await this.procesarCapturaAsesor(userId, mensaje)
@@ -177,18 +404,56 @@ export class UniaccBot {
     const usuarioExistente = await this.verificarUsuarioExistente(userId)
     
     if (usuarioExistente) {
+      // 📊 LOG: Usuario reconocido
+      logger.logUserRecognition(userId, true, usuarioExistente)
+      
       // Usuario recurrente - mostrar menú contextual
       return this.mostrarMenuContextual(userId, usuarioExistente)
     } else {
-      // Usuario nuevo - flujo normal
+      // 📊 LOG: Usuario nuevo
+      logger.logUserRecognition(userId, false)
+      
+      // Usuario nuevo - flujo con auto-detección de número
       this.resetUsuario(userId)
+      
+      // 📱 Auto-detectar número de WhatsApp
+      const phoneDetection = detectPhoneFromUserId(userId)
+      
+      if (phoneDetection.isValid) {
+        // Guardar número detectado temporalmente
+        this.setUsuarioState(userId, {
+          flujo_actual: 'captura_inicial',
+          paso_actual: 'confirmar_telefono',
+          datos_prospecto: {
+            telefono_detectado: phoneDetection.formatted,
+            whatsapp: phoneDetection.formatted
+          }
+        })
+        
+        // 📊 LOG: Auto-detección de teléfono
+        logger.logUserRecognition(userId, false, { 
+          phoneDetected: phoneDetection.formatted,
+          country: phoneDetection.country 
+        })
+        
+        // 📊 LOG: Cambio a flujo de confirmación
+        logger.logFlowChange(userId, 'none', 'captura_inicial', 'confirmar_telefono', 'usuario nuevo con teléfono detectado')
+        
+        return generatePhoneConfirmationMessage(phoneDetection.formatted!)
+      } else {
+        // Fallback: flujo tradicional si no se puede detectar
       this.setUsuarioState(userId, {
         flujo_actual: 'captura_inicial',
         paso_actual: 'solicitar_nombre'
       })
+        
+        // 📊 LOG: Cambio a flujo tradicional
+        logger.logFlowChange(userId, 'none', 'captura_inicial', 'solicitar_nombre', 'usuario nuevo sin detección de teléfono')
+        
       return `🎓 ¡Hola! Para brindarte información personalizada sobre UNIACC:
 
 👤 ¿Cuál es tu **nombre completo**?`
+      }
     }
   }
 
@@ -196,6 +461,12 @@ export class UniaccBot {
     const state = this.getUsuarioState(userId)
     
     switch (state.paso_actual) {
+      case 'confirmar_telefono':
+        return await this.procesarConfirmacionTelefono(userId, mensaje)
+        
+      case 'solicitar_telefono_manual':
+        return await this.procesarTelefonoManual(userId, mensaje)
+        
       case 'solicitar_nombre':
         // Guardar nombre y solicitar email
         this.setUsuarioState(userId, {
@@ -203,15 +474,28 @@ export class UniaccBot {
           paso_actual: 'solicitar_email'
         })
         
-        // 🆕 PROGRESSIVE CAPTURE: Crear prospecto inicial con primer campo
-        const prospectoId = await this.crearProspectoInicial(userId, mensaje)
-        if (prospectoId) {
-          // Actualizar estado con ID del prospecto para futuras actualizaciones
+        // 🆕 PROGRESSIVE CAPTURE: Solo crear si no existe ya un prospecto
+        if (!state.prospecto_id) {
+          // Solo crear nuevo prospecto si no hay teléfono confirmado
+          if (!state.datos_prospecto?.telefono_confirmado) {
+            const prospectoId = await this.crearProspectoInicial(userId, mensaje)
+            if (prospectoId) {
+              this.setUsuarioState(userId, {
+                prospecto_id: prospectoId,
+                ultimo_campo_guardado: 'nombre',
+                campos_capturados: ['nombre'],
+                fecha_creacion_prospecto: new Date()
+              })
+            }
+          } else {
+            console.log(`📱 Usuario ya tiene prospecto con teléfono confirmado, actualizando nombre`)
+          }
+        } else {
+          // Actualizar prospecto existente con el nombre
+          await this.actualizarProspectoCampo(state.prospecto_id, 'nombre', mensaje)
           this.setUsuarioState(userId, {
-            prospecto_id: prospectoId,
             ultimo_campo_guardado: 'nombre',
-            campos_capturados: ['nombre'],
-            fecha_creacion_prospecto: new Date()
+            campos_capturados: [...(state.campos_capturados || []), 'nombre']
           })
         }
         
@@ -258,10 +542,15 @@ export class UniaccBot {
           })
         }
         
-        this.setUsuarioState(userId, {
+        // 📱 Verificar si teléfono ya está confirmado
+        const siguientepasoEdad = state.datos_prospecto?.telefono_confirmado ? 'solicitar_region' : 'solicitar_telefono'
+        
+                this.setUsuarioState(userId, {
           datos_prospecto: { ...state.datos_prospecto, edad },
-          paso_actual: 'solicitar_region'
+          paso_actual: siguientepasoEdad
         })
+        
+        if (siguientepasoEdad === 'solicitar_region') {
         return `✅ Edad: ${edad} años
 
 📍 ¿En qué **región** vives?
@@ -284,6 +573,11 @@ export class UniaccBot {
 1️⃣6️⃣ Magallanes
 
 Escribe el **número** de tu región:`
+        } else {
+          return `✅ Edad: ${edad} años
+
+📱 Por último, ¿cuál es tu **teléfono**?`
+        }
 
       case 'solicitar_region':
         const regiones = [
@@ -298,9 +592,15 @@ Escribe el **número** de tu región:`
         }
         
         const regionSeleccionada = regiones[numeroRegion - 1]
+        
+        // 📱 Si teléfono ya confirmado, ir directo al menú principal
+        const siguientepasoRegion = state.datos_prospecto?.telefono_confirmado ? null : 'solicitar_telefono'
+        const siguienteFlujo = state.datos_prospecto?.telefono_confirmado ? 'menu_principal' : 'captura_inicial'
+        
         this.setUsuarioState(userId, {
           datos_prospecto: { ...state.datos_prospecto, region: regionSeleccionada },
-          paso_actual: 'solicitar_telefono'
+          paso_actual: siguientepasoRegion,
+          flujo_actual: siguienteFlujo
         })
         
         // 🆕 PROGRESSIVE CAPTURE: Actualizar región en prospecto existente
@@ -312,9 +612,14 @@ Escribe el **número** de tu región:`
           })
         }
         
-        return `✅ Región: ${regionSeleccionada}
+        if (siguientepasoRegion === null) {
+          // Finalizar captura con teléfono ya confirmado
+          return await this.finalizarCapturaConTelefonoConfirmado(userId, regionSeleccionada)
+        } else {
+          return `✅ Región: ${regionSeleccionada}
 
 📱 Por último, ¿cuál es tu **teléfono**?`
+        }
 
       case 'solicitar_telefono':
         // Validación básica de teléfono
@@ -1034,10 +1339,24 @@ Escribe el nombre de la carrera que quieres estudiar (ejemplo: "Psicología", "A
       }
       
       if (mensaje === '5') {
+        // 🎯 FLUJO INTELIGENTE DE ASESOR
+        console.log(`🎯 [ASESOR] Iniciando flujo inteligente para usuario recurrente: ${userId}`)
+        
+        // 📊 LOG: Selección de asesor
+        logger.logMenuSelection(userId, '5', 'menu_contextual_con_carrera', state.flujo_actual || 'none')
+        
+        const datos = await this.evaluarDatosExistentes(userId, state)
+        
+        // 📊 LOG: Cambio de flujo
+        logger.logFlowChange(userId, state.flujo_actual || 'none', FLUJOS.ADVISOR_CONNECTION, PASOS.COLLECT_BASIC_INFO, 'usuario seleccionó asesor')
+        
         this.setUsuarioState(userId, {
+          flujo_actual: FLUJOS.ADVISOR_CONNECTION,
+          paso_actual: PASOS.COLLECT_BASIC_INFO,
           opcion_menu_seleccionada: 'hablar_asesor'
         })
-        return await this.iniciarCapturaDatos(userId)
+        
+        return await this.iniciarCapturaInteligente(userId, datos, this.getUsuarioState(userId))
       }
     } else {
       // Menú general para usuarios sin carrera específica
@@ -1075,10 +1394,24 @@ Escribe el nombre de la carrera que quieres estudiar (ejemplo: "Psicología", "A
       }
       
       if (mensaje === '5') {
+        // 🎯 FLUJO INTELIGENTE DE ASESOR (MENÚ GENERAL)
+        console.log(`🎯 [ASESOR] Iniciando flujo inteligente para usuario general: ${userId}`)
+        
+        // 📊 LOG: Selección de asesor en menú general
+        logger.logMenuSelection(userId, '5', 'menu_contextual_general', state.flujo_actual || 'none')
+        
+        const datos = await this.evaluarDatosExistentes(userId, state)
+        
+        // 📊 LOG: Cambio de flujo
+        logger.logFlowChange(userId, state.flujo_actual || 'none', FLUJOS.ADVISOR_CONNECTION, PASOS.COLLECT_BASIC_INFO, 'usuario seleccionó asesor (menú general)')
+        
         this.setUsuarioState(userId, {
+          flujo_actual: FLUJOS.ADVISOR_CONNECTION,
+          paso_actual: PASOS.COLLECT_BASIC_INFO,
           opcion_menu_seleccionada: 'hablar_asesor'
         })
-        return await this.iniciarCapturaDatos(userId)
+        
+        return await this.iniciarCapturaInteligente(userId, datos, this.getUsuarioState(userId))
       }
       
       if (mensaje === '6') {
@@ -1515,30 +1848,32 @@ ${facultadInfo && !carreraInfo ? `• **${facultadInfo}** - Programas académico
       if (resultado.success) {
         console.log('🎯 Prospecto guardado en Supabase:', resultado.data?.id)
       } else {
-        console.warn('⚠️ Error Supabase, usando fallback:', resultado.error)
-        // Fallback a memoria local
-        if (typeof (global as any).agregarProspecto === 'function') {
-          (global as any).agregarProspecto({
-            ...datos,
-            whatsapp: userId,
-            carrera_interes: state.carrera_seleccionada || datos.carrera_interes,
-            facultad_interes: state.facultad_seleccionada,
-            region: datos.region
-          })
-        }
+        console.warn('⚠️ Error Supabase:', resultado.error)
+        console.log('📄 [FALLBACK] Deshabilitado - No se guarda en memoria')
+        // FALLBACK DESHABILITADO
+        // if (typeof (global as any).agregarProspecto === 'function') {
+        //   (global as any).agregarProspecto({
+        //     ...datos,
+        //     whatsapp: userId,
+        //     carrera_interes: state.carrera_seleccionada || datos.carrera_interes,
+        //     facultad_interes: state.facultad_seleccionada,
+        //     region: datos.region
+        //   })
+        // }
       }
     } catch (error: any) {
       console.error('💥 Error crítico con Supabase:', error.message)
-      // Fallback a memoria local
-      if (typeof (global as any).agregarProspecto === 'function') {
-        (global as any).agregarProspecto({
-          ...datos,
-          whatsapp: userId,
-          carrera_interes: state.carrera_seleccionada || datos.carrera_interes,
-          facultad_interes: state.facultad_seleccionada,
-          region: datos.region
-        })
-      }
+      console.log('📄 [FALLBACK] Deshabilitado - No se guarda en memoria')
+      // FALLBACK DESHABILITADO
+      // if (typeof (global as any).agregarProspecto === 'function') {
+      //   (global as any).agregarProspecto({
+      //     ...datos,
+      //     whatsapp: userId,
+      //     carrera_interes: state.carrera_seleccionada || datos.carrera_interes,
+      //     facultad_interes: state.facultad_seleccionada,
+      //     region: datos.region
+      //   })
+      // }
     }
 
     // Mantener en menu principal en lugar de resetear

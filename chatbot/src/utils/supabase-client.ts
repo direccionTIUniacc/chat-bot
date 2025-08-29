@@ -369,11 +369,13 @@ export async function guardarMensaje(datos: {
       message_type: (datos.message_type as any) || 'text',
       sender_id: datos.sender_id || undefined,
       sender_name: datos.type === 'bot' ? 'UNIACC Bot' : undefined,
-             metadata: {
+      metadata: {
          timestamp: getChileTime(), // 🕐 Usar hora de Chile
          bot_version: '1.0.0'
        }
     }
+
+    console.log(`💬 Insertando mensaje ${datos.type}:`, datos.content.substring(0, 50))
 
     const { data, error } = await supabase
       .from('mensajes')
@@ -421,15 +423,19 @@ export async function buscarConversacion(phone_number: string): Promise<{
       .eq('status', 'active')
       .order('created_at', { ascending: false })
       .limit(1)
-      .single()
 
-    if (error && error.code !== 'PGRST116') { // PGRST116 = no rows found
+    if (error) {
+      console.warn(`🔍 Error buscando conversación para ${phone_number}:`, error.message)
       return { success: false, error: error.message }
     }
 
-    return { success: true, data: data || undefined }
+    const conversacion = data && data.length > 0 ? data[0] : undefined
+    console.log(`🔍 Conversación para ${phone_number}:`, conversacion ? 'ENCONTRADA' : 'NO ENCONTRADA')
+    
+    return { success: true, data: conversacion }
 
   } catch (error: any) {
+    console.error(`🔍 Error crítico buscando conversación para ${phone_number}:`, error)
     return { success: false, error: error.message }
   }
 }

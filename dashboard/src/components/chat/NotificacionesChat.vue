@@ -43,14 +43,14 @@
         <!-- Lista de notificaciones -->
         <div class="max-h-96 overflow-y-auto">
           <!-- Conversaciones sin asignar -->
-          <div v-if="chat.conversacionesSinAsignar.value.length > 0" class="p-4 border-b border-gray-100">
+          <div v-if="chat.conversacionesPendientes.value.length > 0" class="p-4 border-b border-gray-100">
             <h4 class="text-sm font-medium text-orange-700 mb-3 flex items-center">
               <AlertTriangle class="w-4 h-4 mr-2" />
-              Sin Asignar ({{ chat.conversacionesSinAsignar.value.length }})
+              Sin Asignar ({{ chat.conversacionesPendientes.value.length }})
             </h4>
             <div class="space-y-3">
               <div
-                v-for="conversacion in chat.conversacionesSinAsignar.value.slice(0, 3)"
+                v-for="conversacion in chat.conversacionesPendientes.value.slice(0, 3)"
                 :key="conversacion.id"
                 class="flex items-center space-x-3 p-2 hover:bg-orange-50 rounded-lg cursor-pointer transition-colors"
                 @click="manejarConversacion(conversacion)"
@@ -77,13 +77,13 @@
               </div>
             </div>
             
-            <div v-if="chat.conversacionesSinAsignar.value.length > 3" class="mt-3 text-center">
+            <div v-if="chat.conversacionesPendientes.value.length > 3" class="mt-3 text-center">
               <router-link 
                 to="/conversaciones" 
                 @click="closeNotificaciones"
                 class="text-xs text-orange-600 hover:text-orange-700 font-medium"
               >
-                Ver {{ chat.conversacionesSinAsignar.value.length - 3 }} más
+                Ver {{ chat.conversacionesPendientes.value.length - 3 }} más
               </router-link>
             </div>
           </div>

@@ -419,6 +419,22 @@ const verDetalle = (prospecto: ProspectoActual) => {
   showDetailModal.value = true
 }
 
+const prospectoActualizado = async (prospectoActualizado: any) => {
+  console.log('✅ Prospecto actualizado en Progressive Capture:', prospectoActualizado.nombre)
+  
+  try {
+    // Recargar los datos del Progressive Capture
+    await cargarProspectosProgressiveCapture()
+    
+    // Actualizar el prospecto seleccionado con los nuevos datos
+    selectedProspecto.value = prospectoActualizado
+    
+    console.log('🔄 Progressive Capture actualizado')
+  } catch (error) {
+    console.error('❌ Error recargando Progressive Capture:', error)
+  }
+}
+
 const reactivarCaptura = (prospecto: ProspectoActual) => {
   // Implementar reactivación de captura
   console.log('Reactivar captura:', prospecto)

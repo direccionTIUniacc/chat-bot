@@ -974,6 +974,65 @@ app.get('/health', (req, res) => {
   res.json({ status: 'OK', timestamp: new Date().toISOString() })
 })
 
+// Endpoint para actualizar datos de prospecto
+app.put('/api/prospectos/:whatsapp', async (req, res) => {
+  try {
+    const { supabase } = useSupabase()
+    const { whatsapp } = req.params
+    const datosActualizar = req.body
+
+    console.log(`📝 Actualizando prospecto ${whatsapp}:`, Object.keys(datosActualizar))
+
+    // Preparar datos para actualización (solo campos permitidos)
+    const camposPermitidos = [
+      'nombre', 'email', 'telefono', 'edad', 'region', 'ciudad',
+      'carrera_interes', 'nivel_interes', 'modalidad_preferida', 'horario_preferido',
+      'estado', 'perfil_usuario', 'es_prioritario', 'proximo_seguimiento', 'notas'
+    ]
+
+    const datosLimpios = {}
+    for (const campo of camposPermitidos) {
+      if (datosActualizar[campo] !== undefined) {
+        datosLimpios[campo] = datosActualizar[campo]
+      }
+    }
+
+    // Agregar timestamp de actualización
+    datosLimpios.updated_at = new Date().toISOString()
+
+    // Actualizar en la base de datos
+    const { data: prospectoActualizado, error } = await supabase
+      .from('prospecto_actual')
+      .update(datosLimpios)
+      .eq('whatsapp', whatsapp)
+      .select()
+      .single()
+
+    if (error) {
+      console.error('❌ Error actualizando prospecto:', error)
+      throw error
+    }
+
+    console.log(`✅ Prospecto ${whatsapp} actualizado exitosamente`)
+
+    // Limpiar cache de conversaciones para que se recarguen
+    conversacionesCache = null
+
+    res.json({
+      success: true,
+      data: prospectoActualizado,
+      message: 'Prospecto actualizado exitosamente'
+    })
+
+  } catch (error) {
+    console.error('❌ Error en actualización de prospecto:', error)
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Error interno del servidor'
+    })
+  }
+})
+
 // Test endpoint para verificar búsqueda de prospectos
 app.get('/api/test-prospecto/:phone', async (req, res) => {
   try {

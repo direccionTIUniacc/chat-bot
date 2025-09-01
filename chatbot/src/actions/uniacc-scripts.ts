@@ -67,14 +67,24 @@ export class UniaccBot {
     timestamp: Date
   }> = new Map()
   
-  // Constantes de timeout
-  private readonly SESSION_TIMEOUT = 120000 // 2 minutos
-  private readonly WARNING_TIMEOUT = 90000  // 1.5 minutos
+  // Constantes de timeout (configurables desde .env)
+  private readonly SESSION_TIMEOUT = parseInt(process.env.SESSION_TIMEOUT || '20000')  // Default: 20s para pruebas
+  private readonly WARNING_TIMEOUT = parseInt(process.env.WARNING_TIMEOUT || '10000')  // Default: 10s para pruebas
+  
+  // 💡 Para modificar tiempos:
+  // SESSION_TIMEOUT: tiempo total antes de finalizar sesión
+  // WARNING_TIMEOUT: tiempo antes de mostrar advertencia
+  // Ambos en milisegundos (1 minuto = 60000ms)
 
   constructor(webhookUrl: string, webhookSecret: string) {
     this.webhookUrl = webhookUrl
     this.webhookSecret = webhookSecret
     this.supabaseIntegration = new SupabaseIntegration(webhookUrl, webhookSecret)
+    
+    // Log de configuración de timeouts
+    console.log(`⏰ [CONFIG] Timeouts configurados:`)
+    console.log(`   SESSION_TIMEOUT: ${this.SESSION_TIMEOUT}ms (${this.SESSION_TIMEOUT/1000}s)`)
+    console.log(`   WARNING_TIMEOUT: ${this.WARNING_TIMEOUT}ms (${this.WARNING_TIMEOUT/1000}s)`)
   }
 
   private getUsuarioState(userId: string): UsuarioState {
@@ -1668,9 +1678,81 @@ Escribe el nombre de la carrera que quieres estudiar (ejemplo: "Psicología", "A
   }
 
   private async iniciarCapturaInteligente(userId: string, datos: any, state: any): Promise<string> {
-    // 🎓 CAPTURA INTELIGENTE CON ESTÁNDAR UNIVERSITARIO
+    // 🎓 CAPTURA INTELIGENTE CON RECONOCIMIENTO DE DATOS EXISTENTES
     
-    if (!datos.nombre) {
+    // 🔍 NUEVO: Verificar datos existentes para usuarios recurrentes
+    let datosCompletos = { ...datos }
+    
+    if (state.es_usuario_recurrente || state.datos_prospecto?.nombre) {
+      console.log(`🔍 Usuario recurrente detectado, verificando datos existentes...`)
+      const usuarioExistente = await this.verificarUsuarioExistente(userId)
+      
+      if (usuarioExistente) {
+        // Combinar datos: prioridad a datos existentes en BD
+        datosCompletos = {
+          nombre: usuarioExistente.nombre || datos.nombre,
+          email: usuarioExistente.email || datos.email,
+          telefono: usuarioExistente.telefono || datos.telefono,
+          edad: usuarioExistente.edad || datos.edad,
+          region: usuarioExistente.region || datos.region,
+          carrera_interes: usuarioExistente.carrera_interes || datos.carrera_interes
+        }
+        
+        console.log(`📊 Datos consolidados para asesor:`, {
+          nombre: datosCompletos.nombre,
+          email: !!datosCompletos.email,
+          telefono: !!datosCompletos.telefono,
+          fuente: 'BD + Estado'
+        })
+      }
+    }
+    
+    // ✅ Si ya tiene datos completos, handoff directo
+    if (datosCompletos.nombre && datosCompletos.email) {
+      console.log(`✅ Usuario ${userId} tiene datos completos, iniciando handoff directo`)
+      
+      this.setUsuarioState(userId, {
+        flujo_actual: FLUJOS.ADVISOR_CONNECTION,
+        paso_actual: PASOS.CONNECT_WITH_ADVISOR,
+        opcion_menu_seleccionada: 'hablar_asesor',
+        datos_prospecto: datosCompletos
+      })
+      
+      // 💾 NUEVO: Guardar inmediatamente la solicitud de asesor
+      await this.guardarSolicitudAsesorDirecta(userId, datosCompletos)
+      
+      // 🎯 NUEVO: Limpiar sesión después de guardar solicitud de asesor
+      this.resetUsuario(userId)
+      
+      return `🎉 **¡Perfecto ${datosCompletos.nombre}!**
+
+Veo que ya tienes tus datos registrados:
+📧 Email: ${datosCompletos.email}
+${datosCompletos.telefono ? `📱 Teléfono: ${datosCompletos.telefono}` : ''}
+
+✅ **Tu Solicitud de Asesoramiento Académico ha sido Confirmada**
+
+🎯 **Un asesor especializado de UNIACC te contactará en las próximas 24 horas**
+
+Recibirás información sobre:
+• 📚 Carreras que se ajusten a tu perfil
+• 💰 Becas y financiamiento disponible  
+• 🏫 Modalidades de estudio
+• 📞 Coordinación de una llamada personalizada
+
+📋 **Tu solicitud ha sido procesada exitosamente.**
+
+Un ejecutivo de admisiones revisará tu perfil y te contactará para:
+• Agendar una cita personalizada
+• Resolver todas tus consultas
+• Orientarte sobre el proceso de admisión
+
+💬 **¡Gracias por confiar en UNIACC!**
+
+Para realizar una nueva consulta, escribe **"Hola"** en cualquier momento.`
+    }
+    
+    if (!datosCompletos.nombre) {
       this.setUsuarioState(userId, {
         flujo_actual: FLUJOS.PROSPECT_CAPTURE,
         paso_actual: PASOS.COLLECT_BASIC_INFO,
@@ -1687,17 +1769,17 @@ Nuestros asesores están capacitados para ayudarte con:
 👤 Para comenzar, ¿cuál es tu **nombre completo**?`
     }
     
-    if (!datos.email) {
+    if (!datosCompletos.email) {
       this.setUsuarioState(userId, {
         flujo_actual: FLUJOS.PROSPECT_CAPTURE,
         paso_actual: PASOS.COLLECT_BASIC_INFO,
         opcion_menu_seleccionada: 'hablar_asesor',
         datos_prospecto: {
           ...state.datos_prospecto,
-          ...datos
+          ...datosCompletos
         }
       })
-      return `👋 **¡Hola ${datos.nombre}! Un placer conocerte**
+      return `👋 **¡Hola ${datosCompletos.nombre}! Un placer verte de nuevo**
 
 Para que nuestro **Asesor Académico** pueda enviarte información personalizada y programar una llamada:
 
@@ -1706,19 +1788,19 @@ Para que nuestro **Asesor Académico** pueda enviarte información personalizada
 💡 *Recibirás información exclusiva sobre UNIACC y tus programas de interés*`
     }
     
-    if (!datos.telefono) {
+    if (!datosCompletos.telefono) {
       this.setUsuarioState(userId, {
         flujo_actual: FLUJOS.PROSPECT_CAPTURE,
         paso_actual: PASOS.COLLECT_CONTACT_PREFERENCES,
         opcion_menu_seleccionada: 'hablar_asesor',
         datos_prospecto: {
           ...state.datos_prospecto,
-          ...datos
+          ...datosCompletos
         }
       })
-      return `✅ **Perfecto ${datos.nombre}!**
+      return `✅ **Perfecto ${datosCompletos.nombre}!**
 
-📧 Email registrado: ${datos.email}
+📧 Email registrado: ${datosCompletos.email}
 
 Para finalizar tu **solicitud de asesoramiento académico**:
 
@@ -2113,6 +2195,46 @@ Escribe el número de tu opción 📝`
     }
   }
 
+  // 🎯 MÉTODO ESPECÍFICO PARA SOLICITUD DE ASESOR DIRECTA
+  private async guardarSolicitudAsesorDirecta(userId: string, datosCompletos: any): Promise<void> {
+    try {
+      console.log(`💾 [ASESOR-DIRECTO] Guardando solicitud de asesor para: ${datosCompletos.nombre}`)
+      
+      const prospectoData: ProspectoData = {
+        nombre: datosCompletos.nombre,
+        email: datosCompletos.email,
+        telefono: datosCompletos.telefono,
+        whatsapp: userId,
+        edad: datosCompletos.edad,
+        region: datosCompletos.region,
+        carrera_interes: datosCompletos.carrera_interes || "Sin especificar",
+        facultad_interes: datosCompletos.facultad_interes || "",
+        nivel_interes: 'alto', // Alto porque pidió asesor
+        tipo_consulta: 'solicitud_asesor', // 🎯 ESTO ES LO IMPORTANTE
+        source: 'uniacc_chatbot',
+        flujo_actual: 'solicitud_asesor',
+        // 🎯 NUEVO: Forzar actualización de prospecto_actual
+        datos_adicionales: {
+          force_update_actual: true,
+          tipo_consulta_actual: 'solicitud_asesor',
+          nivel_interes_actual: 'alto'
+        }
+      }
+
+      console.log(`🔧 DEBUG - Guardando solicitud asesor:`, JSON.stringify(prospectoData, null, 2))
+      const resultado = await this.supabaseIntegration.enviarProspecto(prospectoData)
+      
+      if (resultado.success) {
+        console.log(`✅ [ASESOR-DIRECTO] Solicitud guardada exitosamente: ${resultado.prospectoId}`)
+        console.log(`📋 [ASESOR-DIRECTO] Proceso completado - sesión será limpiada`)
+      } else {
+        console.error(`❌ [ASESOR-DIRECTO] Error guardando solicitud:`, resultado.error)
+      }
+    } catch (error) {
+      console.error(`💥 Error al guardar solicitud de asesor directo:`, error)
+    }
+  }
+
   // 🔄 MÉTODO ESPECÍFICO PARA USUARIOS RECURRENTES
   private async guardarProspectoRecurrente(userId: string, tipoConsulta: string) {
     try {
@@ -2182,23 +2304,49 @@ Escribe el número de tu opción 📝`
 
   // 💾 MÉTODOS DE CAPTURA INCREMENTAL
 
-  // Crear prospecto inicial con solo nombre
-  private async crearProspectoInicial(userId: string, nombre: string): Promise<string | null> {
+  // Crear prospecto inicial con datos disponibles
+  private async crearProspectoInicial(userId: string, datosCompletos?: any): Promise<string | null> {
     try {
+      // Si se pasa un string, es solo el nombre (compatibilidad)
+      let datos = datosCompletos
+      if (typeof datosCompletos === 'string') {
+        datos = { nombre: datosCompletos }
+      }
+      
+      // Obtener nombres legibles para facultad y carrera si están seleccionadas
+      let facultadNombre = datos?.facultad_interes || ""
+      let carreraNombre = datos?.carrera_interes || "Sin especificar"
+      
+      if (datos?.facultad_seleccionada) {
+        const facultad = getFacultadById(datos.facultad_seleccionada)
+        if (facultad) {
+          facultadNombre = facultad.nombre
+        }
+      }
+      
+      if (datos?.carrera_seleccionada && datos?.facultad_seleccionada) {
+        const carrera = getCarreraById(datos.facultad_seleccionada, datos.carrera_seleccionada)
+        if (carrera) {
+          carreraNombre = carrera.nombre
+        }
+      }
+
       const prospectoData: ProspectoData = {
-        nombre: nombre,
-        email: null, // null para cumplir constraint valid_email
-        telefono: null, // null inicialmente
+        nombre: datos?.nombre || 'Usuario WhatsApp',
+        email: datos?.email || null, // null para cumplir constraint valid_email
+        telefono: datos?.telefono || null,
         whatsapp: userId,
-        carrera_interes: "Sin especificar",
-        facultad_interes: "",
-        nivel_interes: 'medio',
-        tipo_consulta: 'abandono solo nombre', // Estado inicial - puede cambiar
+        edad: datos?.edad || null,
+        region: datos?.region || null,
+        carrera_interes: carreraNombre,
+        facultad_interes: facultadNombre,
+        nivel_interes: datos?.nivel_interes || 'medio',
+        tipo_consulta: this.determinarTipoConsulta(datos), // Determinar dinámicamente
         source: 'uniacc_chatbot',
         flujo_actual: 'captura_inicial'
       }
 
-      console.log(`💾 Creando prospecto inicial para ${userId}: ${nombre}`)
+      console.log(`💾 Creando prospecto inicial para ${userId}: ${datos?.nombre || 'Usuario WhatsApp'}`)
       const resultado = await this.supabaseIntegration.enviarProspecto(prospectoData)
       
       if (resultado.success) {
@@ -2213,6 +2361,42 @@ Escribe el número de tu opción 📝`
       console.error(`💥 Error crítico creando prospecto inicial:`, error)
       return null
     }
+  }
+
+  // Determinar tipo de consulta basado en datos disponibles
+  private determinarTipoConsulta(datos: any, estado?: any): string {
+    if (!datos) return 'abandono sin datos'
+    
+    // 🎯 Si viene del flujo de asesor, priorizar eso
+    if (estado?.opcion_menu_seleccionada === 'hablar_asesor' || estado?.flujo_actual === 'advisor_connection') {
+      return 'solicitud_asesor'
+    }
+    
+    // Verificar campos completos incluyendo edad y región
+    const tieneBasicos = datos.email && datos.telefono && datos.nombre
+    const tieneAdicionales = datos.edad && datos.region
+    const tieneCarrera = datos.carrera_seleccionada || datos.carrera_interes
+    
+    if (tieneBasicos && tieneAdicionales && tieneCarrera) {
+      return 'perfil completo'
+    }
+    if (tieneBasicos && tieneCarrera) {
+      return 'datos completos con carrera'
+    }
+    if (tieneBasicos) {
+      return 'datos completos'
+    }
+    if (datos.email && datos.nombre) {
+      return 'abandono con email'
+    }
+    if (datos.telefono && datos.nombre) {
+      return 'abandono con telefono'
+    }
+    if (datos.nombre) {
+      return 'abandono solo nombre'
+    }
+    
+    return 'abandono sin datos'
   }
 
   // Actualizar prospecto con campo específico
@@ -2431,6 +2615,15 @@ Un asesor podrá contactarte cuando lo necesites.
   private shouldSaveTimeoutData(state: UsuarioState): boolean {
     const datos = state.datos_prospecto
     
+    // No guardar si no hay datos útiles
+    if (!datos.nombre) return false
+    
+    // 🎯 NUEVO: Si ya pidió asesor, NO hacer timeout adicional
+    if (state.opcion_menu_seleccionada === 'hablar_asesor' || state.flujo_actual === 'advisor_connection') {
+      console.log(`🎯 [TIMEOUT-SKIP] Usuario ya pidió asesor, saltando timeout para preservar solicitud`)
+      return false
+    }
+    
     // 🆕 PROGRESSIVE: Si ya tiene prospecto_id, siempre actualizar
     if (state.prospecto_id) {
       return true
@@ -2478,19 +2671,18 @@ Un asesor podrá contactarte cuando lo necesites.
     
     // 🄆 FALLBACK: Si no hay prospecto_id, crear uno nuevo (caso legacy)
     if (datos.nombre) {
-      const prospectoId = await this.crearProspectoInicial(userId, datos.nombre)
+      // Incluir también facultad y carrera seleccionadas del estado
+      const datosCompletos = {
+        ...datos,
+        facultad_seleccionada: state.facultad_seleccionada,
+        carrera_seleccionada: state.carrera_seleccionada
+      }
+      const prospectoId = await this.crearProspectoInicial(userId, datosCompletos)
       
       if (prospectoId) {
-        // Actualizar campos adicionales si existen
-        if (datos.email) await this.actualizarProspectoCampo(prospectoId, 'email', datos.email)
-        if (datos.edad) await this.actualizarProspectoCampo(prospectoId, 'edad', datos.edad)
-        if (datos.region) await this.actualizarProspectoCampo(prospectoId, 'region', datos.region)
-        if (datos.telefono) await this.actualizarProspectoCampo(prospectoId, 'telefono', datos.telefono)
-        
-        // Finalizar como abandono
-        const tipoConsulta = datos.telefono ? 'ingreso solo datos basicos' : 'abandono incompleto'
-        await this.finalizarProspecto(prospectoId, tipoConsulta, 'bajo')
-        
+        // Los campos ya se incluyen en la creación inicial, no es necesario actualizarlos
+        const tipoConsulta = this.determinarTipoConsulta(datos, state)
+        console.log(`✅ Prospecto creado con todos los datos disponibles: ${prospectoId}`)
         console.log(`✅ Prospecto timeout creado y finalizado: ${prospectoId} (${tipoConsulta})`)
       }
     }

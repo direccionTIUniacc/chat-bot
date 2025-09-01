@@ -224,6 +224,12 @@
             </div>
             <div class="flex space-x-3">
               <button
+                @click="abrirModalEdicion"
+                class="px-4 py-2 border border-blue-300 rounded-md text-blue-700 bg-blue-50 hover:bg-blue-100 transition-colors text-sm"
+              >
+                ✏️ Editar Datos
+              </button>
+              <button
                 v-if="puedeReactivar"
                 @click="$emit('reactivar', prospecto)"
                 class="btn-secondary text-sm"
@@ -242,10 +248,20 @@
       </div>
     </div>
   </div>
+
+  <!-- Modal de Edición -->
+  <EditarProspectoModal
+    :is-open="mostrarModalEdicion"
+    :prospecto="prospecto"
+    @close="cerrarModalEdicion"
+    @save="guardarDatosProspecto"
+  />
+
+
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { 
   X, 
   User, 
@@ -257,6 +273,7 @@ import {
   Clock 
 } from 'lucide-vue-next'
 import { formatDateTime, formatTimeAgo, formatTipoConsulta, formatStatus } from '@/utils/formatters'
+import EditarProspectoModal from '@/components/modals/EditarProspectoModal.vue'
 
 // Props
 interface Props {
@@ -267,10 +284,14 @@ interface Props {
 const props = defineProps<Props>()
 
 // Emits
-defineEmits<{
+const emit = defineEmits<{
   close: []
   reactivar: [prospecto: any]
+  updated: [prospecto: any]
 }>()
+
+// State
+const mostrarModalEdicion = ref(false)
 
 // Computed
 const camposCapturados = computed(() => [
@@ -335,5 +356,59 @@ const formatNivelInteres = (nivel: string): string => {
     'urgente': '🚨 Urgente'
   }
   return labels[nivel as keyof typeof labels] || nivel
+}
+
+// Functions
+const abrirModalEdicion = () => {
+  console.log('🔧 Abriendo modal de edición...')
+  console.log('📋 Prospecto:', props.prospecto)
+  mostrarModalEdicion.value = true
+  console.log('✅ mostrarModalEdicion.value:', mostrarModalEdicion.value)
+  
+  // Modal funcionando correctamente
+}
+
+const cerrarModalEdicion = () => {
+  mostrarModalEdicion.value = false
+}
+
+const guardarDatosProspecto = async (datosActualizados: any) => {
+  try {
+    const whatsapp = datosActualizados.whatsapp || props.prospecto?.whatsapp
+    
+    if (!whatsapp) {
+      throw new Error('No se encontró el identificador del prospecto')
+    }
+
+    console.log('📝 Guardando datos del prospecto:', whatsapp)
+
+    const response = await fetch(`http://localhost:3002/api/prospectos/${whatsapp}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(datosActualizados)
+    })
+
+    const result = await response.json()
+
+    if (result.success) {
+      console.log('✅ Prospecto actualizado exitosamente')
+      
+      // Emitir evento para actualizar los datos en el componente padre
+      emit('updated', result.data)
+      
+      // Cerrar modal de edición
+      cerrarModalEdicion()
+      
+      // Mostrar mensaje de éxito
+      alert('✅ Datos guardados exitosamente')
+    } else {
+      throw new Error(result.error || 'Error al guardar los datos')
+    }
+  } catch (error) {
+    console.error('❌ Error guardando datos:', error)
+    alert('❌ Error al guardar los datos. Inténtalo de nuevo.')
+  }
 }
 </script>

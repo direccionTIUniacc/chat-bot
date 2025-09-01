@@ -6,13 +6,13 @@
         <h1 class="text-2xl font-bold text-gray-900">Prospectos</h1>
         <p class="text-gray-600">Gestiona los prospectos generados por el ChatBot</p>
       </div>
-      <button 
+      <!-- <button 
         @click="prospectosStore.openModal('create')"
         class="btn-primary"
       >
         <Plus class="w-4 h-4 mr-2" />
         Nuevo Prospecto
-      </button>
+      </button> -->
     </div>
 
     <!-- Filtros y búsqueda -->
@@ -248,7 +248,7 @@
                     >
                       <div class="py-1">
                         <button
-                          @click="prospectosStore.openModal('edit', prospecto); activeDropdown = null"
+                          @click="abrirModalEdicion(prospecto); activeDropdown = null"
                           class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                         >
                           ✏️ Editar Datos
@@ -308,6 +308,15 @@
       :prospecto="selectedProspecto"
       @close="cerrarModal"
       @reactivar="reactivarCaptura"
+      @updated="prospectoActualizado"
+    />
+
+    <!-- Modal de Edición Directo -->
+    <EditarProspectoModal
+      :is-open="showEditModal"
+      :prospecto="prospectoParaEditar"
+      @close="cerrarModalEdicion"
+      @save="guardarDatosProspecto"
     />
   </div>
 </template>
@@ -320,6 +329,7 @@ import { formatDate, formatStatus, formatSource, formatTipoConsulta, formatDateT
 import { PROSPECTO_ESTADOS_COLORS, PROSPECTO_FUENTES_COLORS } from '@/utils/constants'
 import LoadingSpinner from '@/components/common/LoadingSpinner.vue'
 import ProspectoDetailModal from '@/components/prospectos/ProspectoDetailModal.vue'
+import EditarProspectoModal from '@/components/modals/EditarProspectoModal.vue'
 import { 
   generarMensajeWhatsApp, 
   validarHorarioLaboral, 
@@ -352,6 +362,8 @@ const currentUser = ref<UsuarioActual>({
 // Estado para modal de detalle
 const showDetailModal = ref(false)
 const selectedProspecto = ref<any>(null)
+const showEditModal = ref(false)
+const prospectoParaEditar = ref<any>(null)
 
 // Computed
 const paginationPages = computed(() => {
@@ -562,6 +574,73 @@ const verPerfilCompleto = (prospecto: any) => {
 const cerrarModal = () => {
   showDetailModal.value = false
   selectedProspecto.value = null
+}
+
+const abrirModalEdicion = (prospecto: any) => {
+  console.log('🔧 Abriendo modal de edición directo para:', prospecto.nombre)
+  prospectoParaEditar.value = prospecto
+  showEditModal.value = true
+}
+
+const cerrarModalEdicion = () => {
+  showEditModal.value = false
+  prospectoParaEditar.value = null
+}
+
+const guardarDatosProspecto = async (datosActualizados: any) => {
+  try {
+    const whatsapp = datosActualizados.whatsapp || prospectoParaEditar.value?.whatsapp
+    
+    if (!whatsapp) {
+      throw new Error('No se encontró el identificador del prospecto')
+    }
+
+    console.log('📝 Guardando datos del prospecto:', whatsapp)
+
+    const response = await fetch(`http://localhost:3002/api/prospectos/${whatsapp}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(datosActualizados)
+    })
+
+    const result = await response.json()
+
+    if (result.success) {
+      console.log('✅ Prospecto actualizado exitosamente')
+      
+      // Recargar la lista de prospectos
+      await cargarProspectos()
+      
+      // Cerrar modal de edición
+      cerrarModalEdicion()
+      
+      // Mostrar mensaje de éxito
+      alert('✅ Datos guardados exitosamente')
+    } else {
+      throw new Error(result.error || 'Error al guardar los datos')
+    }
+  } catch (error) {
+    console.error('❌ Error guardando datos:', error)
+    alert('❌ Error al guardar los datos. Inténtalo de nuevo.')
+  }
+}
+
+const prospectoActualizado = async (prospectoActualizado: any) => {
+  console.log('✅ Prospecto actualizado:', prospectoActualizado.nombre)
+  
+  try {
+    // Recargar la lista de prospectos para reflejar los cambios
+    await cargarProspectos()
+    
+    // Actualizar el prospecto seleccionado con los nuevos datos
+    selectedProspecto.value = prospectoActualizado
+    
+    console.log('🔄 Lista de prospectos actualizada')
+  } catch (error) {
+    console.error('❌ Error recargando prospectos:', error)
+  }
 }
 
 const reactivarCaptura = async (prospecto: any) => {

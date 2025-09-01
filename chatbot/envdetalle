@@ -28,4 +28,15 @@ UNIACC_PHONE=+56226406000
 
 # Logging
 LOG_LEVEL=info
-LOG_FILE=logs/bot.log" >> .env
+LOG_FILE=logs/bot.log
+
+# Timeout Configuration (en milisegundos)
+SESSION_TIMEOUT=20000  # Tiempo total antes de timeout final (20 segundos para pruebas)
+WARNING_TIMEOUT=10000  # Tiempo antes de mostrar advertencia (10 segundos para pruebas)
+
+# Para producción, valores recomendados:
+# SESSION_TIMEOUT=120000  # 2 minutos
+# WARNING_TIMEOUT=90000   # 1.5 minutos
+
+# Chat Demo Configuration
+CURRENT_PHONE=56912345809  # Número de teléfono para testing del chat demo

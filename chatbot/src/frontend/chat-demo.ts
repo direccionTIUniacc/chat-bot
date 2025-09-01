@@ -249,12 +249,12 @@ class UNIACCChatDemo {
     
     this.currentUserId = this.currentPhone;
     
-    // Verificar cada 3 segundos
+    // Verificar cada 1 segundo (para pruebas con timeout corto)
     this.timeoutCheckInterval = window.setInterval(() => {
       this.checkForTimeoutMessages();
-    }, 3000);
+    }, 1000);
     
-    console.log(`⏰ [POLLING] Sistema iniciado - Verificando cada 3s - Interval ID: ${this.timeoutCheckInterval}`);
+    console.log(`⏰ [POLLING] Sistema iniciado - Verificando cada 1s - Interval ID: ${this.timeoutCheckInterval}`);
   }
 
   private async checkForTimeoutMessages(): Promise<void> {

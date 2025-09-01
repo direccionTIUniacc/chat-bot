@@ -34,19 +34,23 @@
           <!-- Notificaciones de Chat -->
           <NotificacionesChat />
 
-          <!-- Notificaciones generales -->
+          <!-- Notificaciones generales - OCULTO -->
+          <!-- 
           <button
             class="p-2 text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-uniacc-primary focus:ring-offset-2 rounded-md"
           >
             <Bell class="w-5 h-5" />
           </button>
+          -->
 
-          <!-- Configuración -->
+          <!-- Configuración - OCULTO -->
+          <!-- 
           <button
             class="p-2 text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-uniacc-primary focus:ring-offset-2 rounded-md"
           >
             <Settings class="w-5 h-5" />
           </button>
+          -->
 
           <!-- Menú móvil -->
           <button
@@ -84,7 +88,7 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
-import { Home, Users, BarChart3, MessageSquare, UserCheck, Zap, Globe, Bell, Settings, Menu, TrendingUp } from 'lucide-vue-next'
+import { Home, Users, BarChart3, MessageSquare, UserCheck, Zap, Globe, Menu, TrendingUp } from 'lucide-vue-next'
 import NotificacionesChat from '@/components/chat/NotificacionesChat.vue'
 
 const mobileMenuOpen = ref(false)

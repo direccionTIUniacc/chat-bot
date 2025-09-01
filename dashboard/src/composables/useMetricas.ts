@@ -54,7 +54,7 @@ export function useMetricas() {
       error.value = null
 
       // Consultar estadísticas del chatbot
-      const response = await fetch('http://localhost:3001/api/stats')
+      const response = await fetch('http://localhost:3002/api/stats')
       const result = await response.json()
       
       if (result.success && result.data) {

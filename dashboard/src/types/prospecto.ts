@@ -25,14 +25,16 @@ export const ProspectoSchema = z.object({
     'ingreso solo datos basicos',
     'consulta multiple carrera especifica',
     'consulta multiple general',
-    // 🆕 Nuevos valores para progressive capture
+    // 🆕 Progressive Capture States - ACTUALIZADOS
     'captura en proceso',
     'abandono solo nombre',
     'abandono con email', 
+    'abandono con telefono',
     'abandono con edad',
     'abandono con region',
     'abandono incompleto',
-    'captura completa'
+    'captura completa',
+    'timeout_session'  // 🆕 Para timeouts automáticos
   ]).optional(),
   
   // Gestión del prospecto

@@ -49,10 +49,10 @@ app.post('/api/interacciones', async (req, res) => {
 
     // Si no existe la conversación, crearla
     if (conversacionError || !conversacion) {
-      // Buscar prospecto existente por WhatsApp
+      // Buscar prospecto existente por WhatsApp en la tabla correcta
       const { data: prospecto } = await supabase
-        .from('prospectos')
-        .select('id, nombre')
+        .from('prospecto_actual')
+        .select('whatsapp, nombre')
         .eq('whatsapp', whatsapp)
         .single()
 
@@ -61,7 +61,7 @@ app.post('/api/interacciones', async (req, res) => {
         .insert({
           phone_number: whatsapp,
           contact_name: prospecto?.nombre || null,
-          prospecto_id: prospecto?.id || null,
+          prospecto_id: null, // En prospecto_actual no hay ID, usar WhatsApp como referencia
           status: 'active',
           last_message_at: new Date(timestamp),
           message_count: 0,
@@ -81,10 +81,10 @@ app.post('/api/interacciones', async (req, res) => {
       conversacion = nuevaConversacion
     } else {
       // Si la conversación existe pero le faltan datos, actualizarla
-      if (!conversacion.contact_name || !conversacion.prospecto_id) {
+      if (!conversacion.contact_name) {
         const { data: prospecto } = await supabase
-          .from('prospectos')
-          .select('id, nombre')
+          .from('prospecto_actual')
+          .select('whatsapp, nombre')
           .eq('whatsapp', whatsapp)
           .single()
 
@@ -93,7 +93,6 @@ app.post('/api/interacciones', async (req, res) => {
             .from('conversaciones')
             .update({
               contact_name: prospecto.nombre,
-              prospecto_id: prospecto.id,
               contact_info: {
                 nombre: prospecto.nombre,
                 whatsapp: whatsapp,
@@ -175,7 +174,7 @@ app.post('/api/interacciones', async (req, res) => {
   }
 })
 
-// Endpoint para recibir prospectos del chatbot
+// 🆕 Endpoint mejorado para Progressive Capture
 app.post('/api/prospectos', async (req, res) => {
   try {
     // Verificar autorización
@@ -186,61 +185,100 @@ app.post('/api/prospectos', async (req, res) => {
       return res.status(401).json({ error: 'Unauthorized' })
     }
 
-    const { nombre, email, telefono, whatsapp, edad, region, source, carrera_interes, facultad_interes } = req.body
+    const { 
+      nombre, 
+      email, 
+      telefono, 
+      whatsapp, 
+      edad, 
+      region, 
+      source, 
+      carrera_interes, 
+      facultad_interes,
+      tipo_consulta,  // 🆕 Progressive Capture
+      nivel_interes,
+      prospecto_id  // 🆕 Para actualizaciones existentes
+    } = req.body
 
-    // Validar datos requeridos
-    if (!nombre || !email || !whatsapp) {
-      return res.status(400).json({ error: 'Missing required fields: nombre, email, whatsapp' })
+    // 🔄 Validación flexible para Progressive Capture
+    if (!whatsapp) {
+      return res.status(400).json({ error: 'Missing required field: whatsapp' })
+    }
+
+    // Para progressive capture, puede que solo tengamos nombre inicialmente
+    if (!nombre && !prospecto_id) {
+      return res.status(400).json({ error: 'Missing required field: nombre or prospecto_id' })
     }
 
     const { supabase } = useSupabase()
     
-    // Usar función de upsert si existe, sino insertar normalmente
     try {
-      // Intentar usar la función personalizada primero
-      const { data, error } = await supabase.rpc('upsert_prospecto_por_whatsapp', {
-        p_whatsapp: whatsapp,
-        p_nombre: nombre,
-        p_email: email,
-        p_edad: edad,
-        p_region: region,
-        p_telefono: telefono,
-        p_carrera_interes: carrera_interes,
-        p_facultad_interes: facultad_interes
-      })
-
-      if (error) throw error
-
-      console.log('✅ Prospecto upsert exitoso:', data)
-      res.json({ success: true, prospectoId: data })
-    } catch (rpcError) {
-      // Fallback: insertar directamente
-      console.log('⚠️ RPC falló, intentando insert directo:', rpcError.message)
+      let result;
       
-      const { data: prospecto, error: insertError } = await supabase
-        .from('prospectos')
-        .insert({
-          nombre,
-          email,
-          telefono,
-          whatsapp,
-          edad,
-          region,
-          carrera_interes,
-          facultad_interes,
-          fuente: source || 'whatsapp_bot',
-          ultimo_contacto: new Date().toISOString()
-        })
-        .select('id')
-        .single()
+      // 🆕 Si es una actualización de prospecto existente
+      if (prospecto_id) {
+        console.log(`🔄 Actualizando prospecto existente: ${prospecto_id}`)
+        
+        const updateData = {}
+        if (nombre) updateData.nombre = nombre
+        if (email) updateData.email = email
+        if (telefono) updateData.telefono = telefono
+        if (edad) updateData.edad = edad
+        if (region) updateData.region = region
+        if (carrera_interes) updateData.carrera_interes = carrera_interes
+        if (facultad_interes) updateData.facultad_interes = facultad_interes
+        if (tipo_consulta) updateData.tipo_consulta = tipo_consulta
+        if (nivel_interes) updateData.nivel_interes = nivel_interes
+        
+        updateData.updated_at = new Date().toISOString()
+        
+        const { data, error } = await supabase
+          .from('prospectos')
+          .update(updateData)
+          .eq('id', prospecto_id)
+          .select('id')
+          .single()
 
-      if (insertError) {
-        console.error('❌ Error insertando prospecto:', insertError)
-        return res.status(500).json({ error: insertError.message })
+        if (error) throw error
+        result = data
+        
+      } else {
+        // 🆕 Crear nuevo prospecto usando la función especializada
+        console.log(`📝 Creando nuevo prospecto para WhatsApp: ${whatsapp}`)
+        
+        const { data: resultado, error: insertError } = await supabase.rpc('insertar_sesion_prospecto', {
+          p_whatsapp: whatsapp,
+          p_nombre: nombre,
+          p_email: email || null,
+          p_telefono: telefono || null,
+          p_edad: edad || null,
+          p_region: region || null,
+          p_carrera_interes: carrera_interes || 'Sin especificar',
+          p_facultad_interes: facultad_interes || '',
+          p_tipo_consulta: tipo_consulta || 'captura en proceso',
+          p_nivel_interes: nivel_interes || 'medio',
+          p_fuente: source || 'uniacc_chatbot',
+          p_datos_capturados: JSON.stringify({
+            timestamp: new Date().toISOString(),
+            source: 'dashboard_api'
+          }),
+          p_mensajes: 1,
+          p_flujo_completado: false,
+          p_razon_finalizacion: 'en_progreso'
+        })
+
+        if (insertError) throw insertError
+        
+        // La función devuelve el ID del historial, pero necesitamos el whatsapp para compatibilidad
+        result = { id: whatsapp, whatsapp: whatsapp }
       }
 
-      console.log('✅ Prospecto creado:', prospecto.id)
-      res.json({ success: true, prospectoId: prospecto.id })
+      console.log('✅ Prospecto guardado exitosamente:', result.id)
+      res.json({ success: true, prospectoId: result.id })
+
+    } catch (dbError) {
+      console.error('❌ Error en base de datos:', dbError)
+      return res.status(500).json({ error: dbError.message })
     }
 
   } catch (error) {
@@ -304,55 +342,57 @@ app.post('/api/botpress-webhook', async (req, res) => {
 
     const { supabase } = useSupabase()
 
-    // Crear prospecto en Supabase con estructura UNIACC
-    const { data, error } = await supabase
-      .from('prospectos')
-      .insert({
-        nombre: eventData.nombre,
-        email: eventData.email,
-        telefono: eventData.telefono,
-        whatsapp: eventData.whatsapp,
-        edad: eventData.edad,
-        region: eventData.region,
-        carrera_interes: eventData.carrera_interes,
-        facultad_interes: eventData.facultad_interes,
-        nivel_interes: determinarNivelInteres(tipoConsulta, eventData.nivel_interes),
-        fuente: eventData.source || 'uniacc_chatbot',
-        estado: 'nuevo',
-        campus_preferido: eventData.campus_preferido,
-        tipo_consulta: tipoConsulta,
-        created_at: new Date(eventData.timestamp || new Date().toLocaleString("en-US", {timeZone: "America/Santiago"})),
-        metadata: {
-          bot_source: 'uniacc_direct',
-          conversation_flow: eventData.flujo_actual,
-          utm_source: eventData.utm_source,
-          utm_medium: eventData.utm_medium,
-          utm_campaign: eventData.utm_campaign,
-          ...eventData.datos_adicionales
-        }
-      })
-      .select()
-      .single()
+    // Crear prospecto usando la función especializada
+    const { data, error } = await supabase.rpc('insertar_sesion_prospecto', {
+      p_whatsapp: eventData.whatsapp,
+      p_nombre: eventData.nombre,
+      p_email: eventData.email,
+      p_telefono: eventData.telefono,
+      p_edad: eventData.edad,
+      p_region: eventData.region,
+      p_carrera_interes: eventData.carrera_interes || 'Sin especificar',
+      p_facultad_interes: eventData.facultad_interes || '',
+      p_tipo_consulta: tipoConsulta,
+      p_nivel_interes: determinarNivelInteres(tipoConsulta, eventData.nivel_interes),
+      p_fuente: eventData.source || 'uniacc_chatbot',
+      p_datos_capturados: JSON.stringify({
+        bot_source: 'uniacc_direct',
+        conversation_flow: eventData.flujo_actual,
+        utm_source: eventData.utm_source,
+        utm_medium: eventData.utm_medium,
+        utm_campaign: eventData.utm_campaign,
+        timestamp: eventData.timestamp,
+        ...eventData.datos_adicionales
+      }),
+      p_mensajes: 1,
+      p_flujo_completado: true,
+      p_razon_finalizacion: 'completado'
+    })
 
     if (error) {
       console.error('❌ Error creando prospecto UNIACC:', error)
       return res.status(500).json({ success: false, error: error.message })
     }
 
-    console.log('✅ Prospecto UNIACC guardado:', data.id)
+    console.log('✅ Prospecto UNIACC guardado:', data || 'sin ID')
     
-    // Crear notificación para ejecutivos
-    await supabase
-      .from('notificaciones')
-      .insert({
-        tipo: 'nuevo_prospecto',
-        titulo: `Nuevo prospecto: ${data.nombre}`,
-        mensaje: `Interesado en ${data.carrera_interes || 'consulta general'}`,
-        datos: { prospecto_id: data.id },
-        created_at: new Date()
-      })
+    // Crear notificación para ejecutivos (opcional, solo si existe tabla notificaciones)
+    try {
+      await supabase
+        .from('notificaciones')
+        .insert({
+          tipo: 'nuevo_prospecto',
+          titulo: `Nuevo prospecto: ${eventData.nombre}`,
+          mensaje: `Interesado en ${eventData.carrera_interes || 'consulta general'}`,
+          datos: { whatsapp: eventData.whatsapp },
+          created_at: new Date()
+        })
+    } catch (notifError) {
+      // No es crítico si falla la notificación
+      console.warn('⚠️ No se pudo crear notificación:', notifError.message)
+    }
 
-    res.json({ success: true, prospecto_id: data.id, data })
+    res.json({ success: true, prospecto_whatsapp: eventData.whatsapp, data })
 
   } catch (error) {
     console.error('💥 Error procesando lead UNIACC:', error)
@@ -360,29 +400,168 @@ app.post('/api/botpress-webhook', async (req, res) => {
   }
 })
 
-// Endpoint para consultar prospectos por WhatsApp (para reconocimiento de usuarios)
-app.get('/api/prospectos', async (req, res) => {
+// 🆕 Endpoint de reconocimiento mejorado para Progressive Capture
+app.get('/api/prospectos/reconocimiento/:whatsapp', async (req, res) => {
   try {
+    const { whatsapp } = req.params
     const { supabase } = useSupabase()
-    const { whatsapp } = req.query
     
     if (!whatsapp) {
       return res.status(400).json({ success: false, error: 'whatsapp parameter required' })
     }
     
-    // Obtener prospectos por WhatsApp ordenados por fecha
-    const { data: prospectos, error } = await supabase
-      .from('prospectos')
-      .select('id, nombre, email, carrera_interes, tipo_consulta, created_at, nivel_interes')
+    console.log(`🔍 Buscando historial para WhatsApp: ${whatsapp}`)
+    
+    // 🔄 Obtener historial completo ordenado por fecha (más reciente primero)
+    const { data: historial, error: historialError } = await supabase
+      .from('prospecto_historial')
+      .select(`
+        id,
+        whatsapp,
+        sesion_numero,
+        nombre, 
+        email, 
+        telefono,
+        edad,
+        region,
+        carrera_interes, 
+        facultad_interes,
+        tipo_consulta, 
+        nivel_interes,
+        flujo_completado,
+        razon_finalizacion,
+        paso_abandono,
+        created_at,
+        sesion_fin
+      `)
       .eq('whatsapp', whatsapp)
       .order('created_at', { ascending: false })
-      .limit(5) // Últimos 5 para historial
-    
-    if (error) {
-      console.error('❌ Error obteniendo prospectos por WhatsApp:', error)
-      return res.json({ success: false, error: error.message })
+
+    // También obtener estado actual
+    const { data: actual, error: actualError } = await supabase
+      .from('prospecto_actual')
+      .select(`
+        whatsapp,
+        nombre,
+        email,
+        telefono,
+        edad,
+        region,
+        carrera_interes,
+        facultad_interes,
+        nivel_interes,
+        estado,
+        tipo_consulta_actual,
+        total_sesiones,
+        primera_interaccion,
+        ultima_interaccion,
+        perfil_usuario,
+        es_prioritario
+      `)
+      .eq('whatsapp', whatsapp)
+      .single()
+
+    if (historialError && actualError) {
+      console.error('❌ Error obteniendo datos:', { historialError, actualError })
+      return res.json({ success: false, error: 'No se encontraron datos' })
     }
 
+    // 🆕 Análisis de reconocimiento mejorado
+    const esUsuarioRecurrente = (historial && historial.length > 0) || actual
+    const ultimaSessionHistorial = historial?.[0] || null
+    const prospectoCompleto = historial?.find(p => 
+      p.tipo_consulta === 'captura completa' && 
+      p.nombre && p.email && p.telefono
+    )
+    
+    // 🔄 Determinar estado del usuario usando datos actuales e históricos
+    let estadoReconocimiento = 'nuevo'
+    let ultimoCampoGuardado = null
+    
+    // Priorizar estado actual si existe
+    const referenciaProspecto = actual || ultimaSessionHistorial
+    
+    if (referenciaProspecto) {
+      const tipoConsulta = actual?.tipo_consulta_actual || ultimaSessionHistorial?.tipo_consulta
+      
+      if (tipoConsulta?.includes('abandono')) {
+        estadoReconocimiento = 'abandono_previo'
+        ultimoCampoGuardado = determinarUltimoCampo(referenciaProspecto)
+      } else if (tipoConsulta === 'captura completa') {
+        estadoReconocimiento = 'completo_previo'
+      } else if (tipoConsulta === 'captura en proceso') {
+        estadoReconocimiento = 'proceso_previo'
+        ultimoCampoGuardado = determinarUltimoCampo(referenciaProspecto)
+      }
+    }
+
+    const respuesta = {
+      success: true,
+      data: {
+        es_usuario_recurrente: esUsuarioRecurrente,
+        estado_reconocimiento: estadoReconocimiento,
+        prospecto_actual: actual,
+        ultimo_historial: ultimaSessionHistorial,
+        prospecto_completo: prospectoCompleto,
+        ultimo_campo_guardado: ultimoCampoGuardado,
+        total_registros: historial?.length || 0,
+        total_sesiones: actual?.total_sesiones || historial?.length || 0,
+        historial_reciente: historial?.slice(0, 3) || [],
+        puede_continuar_captura: !!referenciaProspecto && 
+          (actual?.tipo_consulta_actual !== 'captura completa' && 
+           ultimaSessionHistorial?.tipo_consulta !== 'captura completa')
+      }
+    }
+
+    console.log(`✅ Reconocimiento completado para ${whatsapp}:`, {
+      recurrente: esUsuarioRecurrente,
+      estado: estadoReconocimiento,
+      registros: historial?.length || 0,
+      sesiones: actual?.total_sesiones || 0
+    })
+
+    res.json(respuesta)
+    
+  } catch (error) {
+    console.error('💥 Error en reconocimiento:', error)
+    res.status(500).json({ success: false, error: 'Error interno' })
+  }
+})
+
+// 🛠️ Función auxiliar para determinar último campo guardado
+function determinarUltimoCampo(prospecto) {
+  if (prospecto.region) return 'region'
+  if (prospecto.edad) return 'edad'  
+  if (prospecto.telefono) return 'telefono'
+  if (prospecto.email) return 'email'
+  if (prospecto.nombre) return 'nombre'
+  return null
+}
+
+// Endpoint para consultar prospectos por WhatsApp (mantener compatibilidad)
+app.get('/api/prospectos', async (req, res) => {
+  try {
+    const { supabase } = useSupabase()
+    const { whatsapp } = req.query
+    
+    if (whatsapp) {
+      // Redirigir al nuevo endpoint de reconocimiento
+      return res.redirect(`/api/prospectos/reconocimiento/${whatsapp}`)
+    }
+    
+    // Sin filtro de WhatsApp, devolver todos los prospectos directamente de la tabla
+    console.log('🔍 Consultando tabla prospecto_actual directamente...')
+    const { data: prospectos, error } = await supabase
+      .from('prospecto_actual')
+      .select('*')
+      .order('ultima_interaccion', { ascending: false })
+    
+    if (error) {
+      console.error('❌ Error obteniendo prospectos:', error)
+      return res.json({ success: true, data: [] })
+    }
+
+    console.log('📊 Primeros datos campos:', prospectos?.[0] ? Object.keys(prospectos[0]) : 'Sin datos')
     res.json({ success: true, data: prospectos || [] })
   } catch (error) {
     console.error('💥 Error en /api/prospectos:', error)
@@ -395,9 +574,9 @@ app.get('/api/stats', async (req, res) => {
   try {
     const { supabase } = useSupabase()
     
-    // Obtener estadísticas de prospectos desde Supabase
+    // Obtener estadísticas de prospectos desde Supabase usando la tabla actual
     const { data: prospectos, error } = await supabase
-      .from('prospectos')
+      .from('prospecto_actual')
       .select('estado')
     
     if (error) {

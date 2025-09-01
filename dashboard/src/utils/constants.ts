@@ -179,9 +179,44 @@ export const APP_URLS = {
   METRICAS: '/metricas'
 }
 
+// 🆕 CONSTANTES PROGRESSIVE CAPTURE
+export const PROGRESSIVE_CAPTURE_CONSTANTS = {
+  TIPOS_CONSULTA: {
+    CAPTURA_EN_PROCESO: 'captura en proceso',
+    ABANDONO_SOLO_NOMBRE: 'abandono solo nombre',
+    ABANDONO_CON_EMAIL: 'abandono con email',
+    ABANDONO_CON_TELEFONO: 'abandono con telefono',
+    ABANDONO_CON_EDAD: 'abandono con edad',
+    ABANDONO_CON_REGION: 'abandono con region',
+    ABANDONO_INCOMPLETO: 'abandono incompleto',
+    CAPTURA_COMPLETA: 'captura completa',
+    TIMEOUT_SESSION: 'timeout_session'
+  },
+  ESTADOS_RECONOCIMIENTO: {
+    NUEVO: 'nuevo',
+    ABANDONO_PREVIO: 'abandono_previo',
+    COMPLETO_PREVIO: 'completo_previo',
+    PROCESO_PREVIO: 'proceso_previo'
+  },
+  CAMPOS_CAPTURA: {
+    NOMBRE: 'nombre',
+    EMAIL: 'email',
+    TELEFONO: 'telefono',
+    EDAD: 'edad',
+    REGION: 'region'
+  }
+} as const
+
 // Configuración del chatbot
 export const CHATBOT_CONFIG = {
   MAX_MESSAGE_LENGTH: 1000,
   SESSION_TIMEOUT: 30 * 60 * 1000, // 30 minutos en ms
-  TYPING_DELAY: 1000
+  TYPING_DELAY: 1000,
+  // 🆕 Progressive Capture Config
+  PROGRESSIVE_CAPTURE: {
+    MAX_RETRIES: 3,
+    TIMEOUT_WARNING_MINUTES: 5,
+    SESSION_TIMEOUT_MINUTES: 10,
+    AUTO_SAVE_ENABLED: true
+  }
 }

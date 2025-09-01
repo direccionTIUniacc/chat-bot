@@ -17,10 +17,20 @@ export const formatDateTime = (date: string | Date): string => {
 
 export const formatDateTimeChile = (date: string | Date): string => {
   try {
+    // Validar que tenemos una fecha válida
+    if (!date) {
+      return 'Sin fecha'
+    }
+
     const dateObj = typeof date === 'string' ? parseISO(date) : date
-    // Convertir a hora de Chile (UTC-3 o UTC-4 según DST)
-    const chileDate = new Date(dateObj.toLocaleString("en-US", {timeZone: "America/Santiago"}))
-    return format(chileDate, 'dd/MM/yyyy HH:mm', { locale: es }) + ' (Chile)'
+    
+    // Verificar que parseISO funcionó
+    if (isNaN(dateObj.getTime())) {
+      return 'Fecha inválida'
+    }
+    
+    // Usar directamente la función format con zona horaria
+    return format(dateObj, 'dd/MM/yyyy HH:mm', { locale: es })
   } catch {
     return 'Fecha inválida'
   }
@@ -28,7 +38,18 @@ export const formatDateTimeChile = (date: string | Date): string => {
 
 export const formatTimeAgo = (date: string | Date): string => {
   try {
+    // Validar que tenemos una fecha válida
+    if (!date) {
+      return 'Sin fecha'
+    }
+    
     const dateObj = typeof date === 'string' ? parseISO(date) : date
+    
+    // Verificar que parseISO funcionó
+    if (isNaN(dateObj.getTime())) {
+      return 'Fecha inválida'
+    }
+    
     return formatDistanceToNow(dateObj, { addSuffix: true, locale: es })
   } catch {
     return 'Fecha inválida'
@@ -56,6 +77,7 @@ export const formatPercentage = (value: number, decimals: number = 1): string =>
 
 // Formatear texto
 export const capitalizeFirst = (str: string): string => {
+  if (!str || typeof str !== 'string') return ''
   return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase()
 }
 
@@ -135,8 +157,12 @@ export const formatStatus = (status: string): string => {
 }
 
 export const formatSource = (source: string): string => {
+  if (!source || typeof source !== 'string') return 'Desconocido'
+  
   const sourceMap: Record<string, string> = {
     'chatbot': 'ChatBot',
+    'whatsapp_bot': 'WhatsApp Bot',
+    'uniacc_chatbot': 'UNIACC ChatBot',
     'web': 'Sitio Web',
     'social': 'Redes Sociales',
     'referido': 'Referido',
@@ -161,14 +187,16 @@ export const formatTipoConsulta = (tipoConsulta: string): string => {
     'consulta multiple carrera especifica': '🔍 Múltiple - Carrera Específica',
     'consulta multiple general': '🔍 Múltiple - General',
     
-    // 🆕 Progressive Capture Values
+    // 🆕 Progressive Capture Values - ACTUALIZADOS
     'captura en proceso': '🔄 Captura en Proceso',
     'abandono solo nombre': '⚠️ Abandono - Solo Nombre',
-    'abandono con email': '⚠️ Abandono - Hasta Email', 
+    'abandono con email': '⚠️ Abandono - Hasta Email',
+    'abandono con telefono': '⚠️ Abandono - Hasta Teléfono',  // 🆕 NUEVO
     'abandono con edad': '⚠️ Abandono - Hasta Edad',
     'abandono con region': '⚠️ Abandono - Hasta Región',
     'abandono incompleto': '❌ Abandono Incompleto',
     'captura completa': '✅ Captura Completa',
+    'timeout_session': '⏰ Timeout de Sesión',  // 🆕 NUEVO
     
     // Retrocompatibilidad con valores antiguos
     'consulta carrera': 'Consulta Carrera',

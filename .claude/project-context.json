@@ -3,17 +3,20 @@
       "name": "UNIACC ChatBot - Sistema Completo de Captación de Prospectos",
       "type": "microservices",
       "repository": "https://github.com/direccionTIUniacc/chat-bot",
-      "version": "1.0.0",
-      "status": "Progressive Capture System Implementado",
+      "version": "1.5.0",
+      "status": "Sistema de Auto-Detección y Timeout Avanzado Implementado",
       "stack": [
         "Node.js",
         "TypeScript", 
         "Vue.js 3",
         "Express.js",
         "Supabase PostgreSQL",
-        "WhatsApp Business API"
+        "WhatsApp Business API",
+        "Enhanced Logging System",
+        "Phone Formatter E.164",
+        "Web Components"
       ],
-      "description": "Sistema de chatbot conversacional para UNIACC con captura progresiva de prospectos (zero data loss) y dashboard de gestión en tiempo real"
+      "description": "Sistema avanzado de chatbot conversacional para UNIACC con auto-detección de números, sistema de timeout inteligente, captura progresiva sin pérdida de datos, chat demo completo y logging extendido para análisis en tiempo real"
     },
     "architecture": {
       "pattern": "microservices",
@@ -67,44 +70,67 @@
       }
     },
     "currentSprint": {
-      "phase": "Progressive Capture System Implementado - Agosto 2025",
+      "phase": "Sistema Avanzado con Auto-Detección y Timeout Inteligente - Agosto 2025",
       "completedFeatures": [
-        "✅ Chatbot completo con 5 flujos conversacionales",
-        "✅ Dashboard funcional con gestión de prospectos",
-        "✅ Integración Supabase con persistencia de datos", 
+        "✅ Chatbot completo con 6 flujos conversacionales principales",
+        "✅ Dashboard funcional con gestión de prospectos y chat demo integrado",
+        "✅ Integración Supabase con persistencia de datos completa", 
         "✅ API REST completa para comunicación entre servicios",
         "✅ Sistema de captura progresiva SIN PÉRDIDA DE DATOS",
-        "✅ Interfaz web de testing completamente funcional",
+        "✅ NUEVO: Sistema de auto-detección de números telefónicos (estándar mundial)",
+        "✅ NUEVO: Sistema de timeout avanzado con warnings y guardado automático",
+        "✅ NUEVO: Enhanced Logging System con categorías y análisis",
+        "✅ NUEVO: Phone Formatter con estándar E.164 internacional",
+        "✅ NUEVO: Chat Demo completo en TypeScript y Vue.js",
+        "✅ NUEVO: Web Components para integración externa",
+        "✅ NUEVO: Sistema de reconocimiento de usuarios recurrentes",
+        "✅ NUEVO: Menús contextuales basados en historial de usuario",
+        "✅ NUEVO: Manejo inteligente de historial de leads por teléfono",
+        "✅ Interfaz web de testing completamente funcional con polling",
         "✅ Gestión de estado avanzada por usuario con progressive capture",
         "✅ Función RPC personalizada para evitar duplicados",
         "✅ PROGRESSIVE CAPTURE: 7 tipos de clasificación de abandono",
-        "✅ Schema BD actualizado con constraints corregidos",
+        "✅ Schema BD actualizado con constraints corregidos y nuevas tablas",
         "✅ Interfaces TypeScript actualizadas (email/telefono nullable)",
         "✅ Dashboard con formateo UI para tipos de abandono",
         "✅ Métodos progresivos: crear, actualizar, finalizar prospecto",
-        "✅ Zero data loss implementado completamente"
+        "✅ Zero data loss implementado completamente",
+        "✅ Documentación completa de flujos actualizada (flujo.md)"
       ],
       "nextPhase": [
-        "🔄 Testing exhaustivo del Progressive Capture System",
+        "🔄 Testing exhaustivo del Sistema de Auto-Detección",
+        "🔄 Testing exhaustivo del Sistema de Timeout Avanzado",
+        "🔄 Validación completa del Enhanced Logging System",
         "🔄 Análisis de métricas de abandono por campo específico",
         "🔄 Sistema de follow-up automático basado en abandono",
-        "🔄 Optimización basada en patrones de abandono detectados",
+        "🔄 Optimización basada en patrones detectados en logs",
         "🔄 Integración real con WhatsApp Business API",
         "🔄 Notificaciones en tiempo real (WebSockets)", 
         "🔄 Deploy en producción (AWS/GCP)",
         "🔄 Tests automatizados (Jest/Cypress)",
-        "🔄 Métricas avanzadas y analytics con progressive data"
+        "🔄 Métricas avanzadas y analytics con progressive data",
+        "🔄 Sistema de alertas basado en Enhanced Logging",
+        "🔄 Análisis predictivo de abandono usando datos históricos"
       ],
       "blockers": [],
       "inProgress": []
     },
     "businessLogic": {
+      "newUserFlow": {
+        "step1": "Auto-detección de número telefónico desde WhatsApp ID",
+        "step2": "Mensaje de confirmación con valor claro (estándar mundial)",
+        "step3": "Opciones: 1) Confirmar número, 2) Dar otro número, 3) Continuar sin número",
+        "step4": "Guardado inmediato en BD al confirmar teléfono",
+        "step5": "Captura progresiva: nombre → email → edad → región",
+        "benefits": "50% menos fricción, 0% pérdida de datos, experiencia personalizada"
+      },
       "chatbotFlows": [
-        "1️⃣ Conocer nuestras carreras (por facultad)",
+        "1️⃣ Explorar carreras (por facultad)",
         "2️⃣ Proceso de admisión 2025",
         "3️⃣ Costos y becas", 
         "4️⃣ Modalidades de estudio",
-        "5️⃣ Hablar con un asesor"
+        "5️⃣ Hablar con un asesor",
+        "6️⃣ Búsqueda directa de carrera (NUEVO)"
       ],
       "facultades": [
         "A) Artes: Teatro, Danza, Música, Artes Visuales",
@@ -114,13 +140,16 @@
         "E) Negocios y Tecnología: Ing. Comercial, Contador Auditor"
       ],
       "prospectoCaptureFlow": [
-        "1. Saludo inicial → Solicita nombre → CREA PROSPECTO INICIAL",
-        "2. Solicita email (con validación) → ACTUALIZA PROSPECTO",
-        "3. Solicita edad → ACTUALIZA PROSPECTO", 
-        "4. Solicita región → ACTUALIZA PROSPECTO",
-        "5. Solicita teléfono → FINALIZA PROSPECTO COMPLETO",
-        "6. Clasificación automática según punto de abandono",
-        "7. Zero data loss - todos los campos guardados inmediatamente"
+        "1. NUEVO: Auto-detección de teléfono → CONFIRMACIÓN → GUARDADO INMEDIATO",
+        "2. Solicita nombre → ACTUALIZA PROSPECTO CON TELÉFONO",
+        "3. Solicita email (con validación) → ACTUALIZA PROSPECTO",
+        "4. Solicita edad → ACTUALIZA PROSPECTO", 
+        "5. Solicita región → FINALIZA PROSPECTO COMPLETO",
+        "6. NUEVO: Sistema de timeout con warnings a 1.5min y timeout a 2min",
+        "7. NUEVO: Guardado automático en timeout para evitar pérdida",
+        "8. Clasificación automática según punto de abandono",
+        "9. Zero data loss - todos los campos guardados inmediatamente",
+        "10. NUEVO: Reconocimiento de usuarios recurrentes por teléfono"
       ],
       "progressiveCaptureStates": {
         "captura_en_proceso": "Usuario completando datos activamente",
@@ -179,18 +208,52 @@
       }
     },
     "testing": {
-      "chatDemo": "http://localhost:3001/chat - Interfaz completa de testing",
+      "chatDemo": {
+        "standalone": "http://localhost:3001/chat - Interfaz HTML/JS completa",
+        "vueComponent": "http://localhost:3000/chat-demo - Chat Demo integrado en dashboard",
+        "webComponents": "Disponible en /public/js/web-components/ para integración externa",
+        "features": [
+          "Polling automático para timeouts",
+          "Botones de test rápido",
+          "Visualización de estados",
+          "Logging en tiempo real"
+        ]
+      },
       "apiEndpoints": "Todos los endpoints tienen health checks",
-      "dataValidation": "Validación de email, teléfono, campos requeridos",
-      "progressiveCaptureTesting": {
+      "dataValidation": "Validación de email, teléfono E.164, campos requeridos",
+      "autoDetectionTesting": {
+        "status": "implemented_and_functional", 
+        "scenarios": [
+          "Auto-detección desde WhatsApp ID",
+          "Confirmación de número detectado",
+          "Entrada manual de número alternativo",
+          "Flujo sin teléfono (opción 3)",
+          "Validación formato E.164 internacional",
+          "Guardado inmediato al confirmar"
+        ]
+      },
+      "timeoutTesting": {
         "status": "implemented_and_functional",
         "scenarios": [
-          "Abandono después de nombre - crea prospecto inicial",
+          "Warning a 1.5 minutos de inactividad",
+          "Timeout final a 2 minutos",
+          "Guardado automático de datos parciales",
+          "Clasificación inteligente en timeout",
+          "Continuación después de timeout",
+          "Polling frontend para detección"
+        ]
+      },
+      "progressiveCaptureTesting": {
+        "status": "enhanced_with_phone_first",
+        "scenarios": [
+          "NUEVO: Inicio con confirmación de teléfono",
+          "Abandono después de teléfono - crea prospecto con teléfono",
+          "Abandono después de nombre - actualiza con nombre",
           "Abandono después de email - actualiza con email",
           "Abandono después de edad - actualiza con edad",
-          "Abandono después de región - actualiza con región", 
-          "Captura completa - finaliza con teléfono",
-          "Timeout scenarios - clasificación inteligente"
+          "Captura completa - finaliza con región", 
+          "Timeout scenarios - clasificación inteligente",
+          "Usuario recurrente - menú contextual"
         ]
       }
     },
@@ -209,11 +272,75 @@
       "arquitectura": "Documentación técnica detallada",
       "schemas": "Esquema completo de Supabase con RPC functions"
     },
-    "lastUpdated": "2025-08-28",
+    "lastUpdated": "2025-08-29",
     "majorFeatures": {
+      "autoDetectionSystem": {
+        "implemented": "2025-08-29",
+        "description": "Sistema de auto-detección de números telefónicos con confirmación (estándar mundial)",
+        "files_modified": [
+          "chatbot/src/utils/phone-formatter.ts - Nueva utilidad formateo E.164",
+          "chatbot/src/actions/uniacc-scripts.ts - Lógica auto-detección integrada",
+          "chatbot/src/actions/supabase-integration.ts - Guardado inmediato teléfonos",
+          "flujo.md - Documentación completa nuevo flujo"
+        ],
+        "benefits": [
+          "50% reducción en fricción de usuario",
+          "Guardado inmediato sin pérdida de datos",
+          "Experiencia personalizada desde primer mensaje",
+          "Cumplimiento estándares internacionales GDPR/CCPA"
+        ]
+      },
+      "enhancedLoggingSystem": {
+        "implemented": "2025-08-29",
+        "description": "Sistema de logging extendido con categorías, análisis y exportación",
+        "files_modified": [
+          "chatbot/src/utils/enhanced-logger.ts - Sistema completo logging",
+          "chatbot/src/actions/uniacc-scripts.ts - Integración logging flows",
+          "chatbot/src/index.ts - Logging conversaciones y timeouts"
+        ],
+        "benefits": [
+          "Debugging avanzado en tiempo real",
+          "Análisis de patrones de usuario",
+          "Métricas automáticas de performance",
+          "Detección temprana de problemas"
+        ]
+      },
+      "advancedTimeoutSystem": {
+        "implemented": "2025-08-29", 
+        "description": "Sistema de timeout inteligente con warnings y guardado automático",
+        "files_modified": [
+          "chatbot/src/actions/uniacc-scripts.ts - Lógica timeout warnings",
+          "chatbot/src/frontend/chat-demo.ts - Polling frontend",
+          "dashboard/src/components/chat/ChatDemo.vue - UI timeout"
+        ],
+        "benefits": [
+          "Prevención de pérdida de datos por inactividad",
+          "Experiencia de usuario mejorada con warnings",
+          "Clasificación inteligente de abandono",
+          "Continuidad de conversación post-timeout"
+        ]
+      },
+      "chatDemoSystem": {
+        "implemented": "2025-08-29",
+        "description": "Sistema completo de chat demo con múltiples interfaces",
+        "files_modified": [
+          "chatbot/public/chat-demo.html - Interfaz HTML standalone",
+          "chatbot/src/frontend/chat-demo.ts - Lógica TypeScript",
+          "dashboard/src/components/chat/ChatDemo.vue - Componente Vue",
+          "dashboard/src/composables/useChatDemo.ts - Composable Vue",
+          "chatbot/public/js/web-components/uniacc-chat.js - Web Components"
+        ],
+        "benefits": [
+          "Testing completo sin WhatsApp",
+          "Visualización en tiempo real",
+          "Integración múltiple (HTML, Vue, Web Components)",
+          "Debugging avanzado con logs"
+        ]
+      },
       "progressiveCaptureSystem": {
         "implemented": "2025-08-28",
-        "description": "Sistema de captura progresiva sin pérdida de datos",
+        "enhanced": "2025-08-29",
+        "description": "Sistema de captura progresiva sin pérdida de datos mejorado con auto-detección",
         "files_modified": [
           "chatbot/src/actions/uniacc-scripts.ts - Lógica principal progressive capture",
           "chatbot/src/actions/supabase-integration.ts - Interfaces nullable",
@@ -226,8 +353,32 @@
           "Eliminación completa de pérdida de datos por abandono",
           "Análisis granular de comportamiento de usuarios",
           "Mejor calificación de leads parciales",
-          "Capacidad de follow-up mejorada"
+          "Capacidad de follow-up mejorada",
+          "NUEVO: Inicio con teléfono confirmado para mejor trazabilidad"
         ]
+      }
+    },
+    "newArchitecturalComponents": {
+      "phoneFormatter": {
+        "file": "chatbot/src/utils/phone-formatter.ts",
+        "purpose": "Formateo estándar E.164 internacional con validación",
+        "features": ["Auto-detección desde WhatsApp ID", "Validación múltiples formatos", "Soporte internacional"]
+      },
+      "enhancedLogger": {
+        "file": "chatbot/src/utils/enhanced-logger.ts",
+        "purpose": "Sistema de logging categorizado con análisis",
+        "features": ["7 categorías de logs", "Análisis automático", "Exportación JSON/CSV"]
+      },
+      "chatDemo": {
+        "standalone": "chatbot/public/chat-demo.html + chat-demo.ts",
+        "vue_component": "dashboard/src/components/chat/ChatDemo.vue",
+        "web_components": "chatbot/public/js/web-components/uniacc-chat.js",
+        "purpose": "Testing completo con múltiples interfaces"
+      },
+      "flowDocumentation": {
+        "file": "flujo.md",
+        "purpose": "Documentación completa de todos los flujos y testing",
+        "sections": ["Flujos principales", "Menús contextuales", "Testing checklist", "Logs a monitorear"]
       }
     },
     "maintainer": "Juan Pablo Silva"

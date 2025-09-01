@@ -11,7 +11,24 @@
     "build:all": "npm run build && npm run build:frontend",
     "watch:frontend": "tsc -p tsconfig.frontend.json --watch",
     "start": "node dist/index.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "test:flows": "jest --testPathPattern=tests/flows",
+    "test:integration": "jest --testPathPattern=tests/integration",
+    "test:unit": "jest --testPathPattern=tests/unit",
+    "test:flows:interactive": "ts-node src/testing/runners/interactive-runner.ts",
+    "test:flows:report": "ts-node src/testing/runners/flow-runner.ts",
+    "test:stress": "ts-node src/testing/runners/stress-runner.ts",
+    "test:integration": "jest --testPathPattern=src/testing.*integration",
+    "test:demo": "ts-node src/testing/examples/simple-demo.ts",
+    "test:demo:basic": "ts-node src/testing/examples/simple-demo.ts basic",
+    "test:demo:full": "ts-node src/testing/examples/complete-test-example.ts",
+    "test:demo:stress": "ts-node src/testing/examples/complete-test-example.ts stress",
+    "test:demo:concurrent": "ts-node src/testing/examples/complete-test-example.ts concurrent",
+    "test:pipeline": "ts-node src/testing/runners/flow-runner.ts full --monitor --export",
+    "test:load": "ts-node src/testing/runners/flow-runner.ts load --monitor",
+    "test:performance": "ts-node src/testing/examples/complete-test-example.ts performance"
   },
   "keywords": [
     "chatbot",
@@ -33,11 +50,40 @@
   "devDependencies": {
     "@types/cors": "^2.8.17",
     "@types/express": "^4.17.21",
+    "@types/jest": "^29.5.13",
     "@types/node": "^22.16.5",
     "concurrently": "^9.2.1",
+    "jest": "^29.7.0",
     "nodemon": "^3.1.10",
+    "ts-jest": "^29.2.5",
     "ts-node": "^10.9.2",
     "tsconfig-paths": "^4.2.0",
     "typescript": "^5.8.0"
+  },
+  "jest": {
+    "preset": "ts-jest",
+    "testEnvironment": "node",
+    "roots": ["<rootDir>/src"],
+    "testMatch": [
+      "**/src/testing/**/*.test.ts",
+      "**/src/testing/**/*.spec.ts",
+      "**/__tests__/**/*.ts"
+    ],
+    "transform": {
+      "^.+\\.ts$": "ts-jest"
+    },
+    "collectCoverageFrom": [
+      "src/**/*.ts",
+      "!src/**/*.d.ts",
+      "!src/index.ts",
+      "!src/testing/**/*.ts"
+    ],
+    "coverageDirectory": "coverage",
+    "coverageReporters": ["text", "lcov", "html"],
+    "setupFilesAfterEnv": ["<rootDir>/src/testing/config/test-environment.ts"],
+    "moduleNameMapping": {
+      "@/*": "<rootDir>/src/*",
+      "@testing/*": "<rootDir>/src/testing/*"
+    }
   }
 }

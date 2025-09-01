@@ -84,7 +84,7 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
-import { Home, Users, BarChart3, MessageSquare, UserCheck, Zap, Globe, Bell, Settings, Menu, Bot } from 'lucide-vue-next'
+import { Home, Users, BarChart3, MessageSquare, UserCheck, Zap, Globe, Bell, Settings, Menu, TrendingUp } from 'lucide-vue-next'
 import NotificacionesChat from '@/components/chat/NotificacionesChat.vue'
 
 const mobileMenuOpen = ref(false)
@@ -92,8 +92,8 @@ const mobileMenuOpen = ref(false)
 const navigationItems = [
   { name: 'Dashboard', href: '/dashboard', icon: Home },
   { name: 'Prospectos', href: '/prospectos', icon: Users },
+  { name: 'Progressive Capture', href: '/progressive-capture', icon: TrendingUp },
   { name: 'Conversaciones', href: '/conversaciones', icon: MessageSquare },
-  { name: 'Chat Demo', href: '/chat-demo', icon: Bot },
   { name: 'Ejecutivos', href: '/ejecutivos', icon: UserCheck },
   { name: 'Fuentes', href: '/fuentes', icon: Globe },
   { name: 'Automatizaciones', href: '/automatizaciones', icon: Zap },

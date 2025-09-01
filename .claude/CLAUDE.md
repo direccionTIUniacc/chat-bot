@@ -9,7 +9,7 @@
 ### Información Básica del Proyecto
 - **Institución**: Universidad de Artes, Ciencias y Comunicaciones (UNIACC)
 - **Objetivo**: Sistema de captura automática de prospectos vía WhatsApp
-- **Estado**: Progressive Capture System IMPLEMENTADO - Agosto 2025
+- **Estado**: Sistema Avanzado con Auto-Detección y Timeout Inteligente - Agosto 2025
 - **Maintainer**: Juan Pablo Silva
 
 ## ARQUITECTURA DEL SISTEMA
@@ -23,10 +23,17 @@ UNIACC-ChatBot/
 ```
 
 ### URLs de Desarrollo CRÍTICAS
-- **Chat Testing**: http://localhost:3001/chat (PRINCIPAL PARA DEBUGGING)
+- **Chat Testing**: http://localhost:3001/chat (PRINCIPAL PARA DEBUGGING - HTML/JS)
+- **Chat Demo Vue**: http://localhost:3000/chat-demo (INTEGRADO EN DASHBOARD)
 - **Dashboard**: http://localhost:3000
 - **API Health**: http://localhost:3002/health
 - **Bot Stats**: http://localhost:3001/stats
+
+### NUEVAS HERRAMIENTAS DE TESTING (Agosto 2025)
+- **Auto-Detección**: Prueba automática detección de números telefónicos
+- **Timeout System**: Sistema de warnings y timeout automático con polling
+- **Enhanced Logging**: Logs categorizados en tiempo real para debugging
+- **Web Components**: Componentes reutilizables para integración externa
 
 ## SISTEMA DE TESTING AUTOMATIZADO ✅
 
@@ -49,17 +56,23 @@ npm run test-with-services          # Con verificación previa
 ```
 
 #### Escenarios Críticos Testeados
-1. **Progressive Capture Complete** - Flujo completo sin abandonos
-2. **Abandono con Email** - Manejo de abandonos parciales
-3. **Returning User Recognition** - Sistema de reconocimiento automático
-4. **Anti-Duplicates Validation** - Prevención de prospectos duplicados
-5. **Asesor Urgente Flow** - Flujo crítico de solicitud de asesor
+1. **NUEVO: Auto-Detection System** - Detección automática de números telefónicos
+2. **NUEVO: Advanced Timeout System** - Warnings a 1.5min, timeout a 2min con guardado automático
+3. **Progressive Capture Complete** - Flujo completo sin abandonos (MEJORADO con teléfono primero)
+4. **Abandono con Email** - Manejo de abandonos parciales
+5. **Returning User Recognition** - Sistema de reconocimiento automático con menús contextuales
+6. **Anti-Duplicates Validation** - Prevención de prospectos duplicados
+7. **Asesor Urgente Flow** - Flujo crítico de solicitud de asesor
+8. **NUEVO: Enhanced Logging Validation** - Sistema de logs categorizados
 
 #### Validaciones Automáticas
 - ✅ **Zero Data Loss**: Cada campo se guarda inmediatamente en BD
-- ✅ **Estado Evolution**: `captura en proceso` → `captura completa`
+- ✅ **NUEVO: Auto-Detection**: Teléfonos detectados y validados en formato E.164
+- ✅ **NUEVO: Timeout Prevention**: Guardado automático en timeouts sin pérdida
+- ✅ **Estado Evolution**: `captura en proceso` → `captura completa` (MEJORADO)
 - ✅ **Database Consistency**: Verificación de constraints y RPC functions
 - ✅ **Response Validation**: Validación de respuestas del bot
+- ✅ **NUEVO: Enhanced Logging**: Logs categorizados con análisis automático
 - ✅ **Performance Metrics**: Tiempos de respuesta y procesamiento
 
 #### Estructura del Sistema de Testing

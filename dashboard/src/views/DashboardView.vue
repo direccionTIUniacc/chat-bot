@@ -69,7 +69,7 @@
         <div v-else class="space-y-3">
           <div
             v-for="prospecto in recentProspectos"
-            :key="prospecto.id"
+            :key="(prospecto as any).whatsapp || prospecto.id"
             class="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
           >
             <div>
@@ -84,7 +84,7 @@
                 {{ formatStatus(prospecto.estado) }}
               </span>
               <p class="text-xs text-gray-500 mt-1">
-                {{ formatTimeAgo(prospecto.created_at) }}
+                {{ formatTimeAgo((prospecto as any).primera_interaccion || (prospecto as any).created_at) }}
               </p>
             </div>
           </div>

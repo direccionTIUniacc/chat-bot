@@ -46,18 +46,26 @@ export function useProspectos() {
       loading.value = true
       error.value = null
 
-      // Simular delay para mostrar loading
-      await new Promise(resolve => setTimeout(resolve, 500))
+      console.log('🔍 Fetching prospectos from dashboard API...')
 
-      // Consultar datos del bot
-      const response = await fetch('http://localhost:3001/api/prospectos')
+      // Consultar datos del dashboard API
+      const response = await fetch('http://localhost:3002/api/prospectos')
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+      }
+      
       const result = await response.json()
+      console.log('📊 API Response:', result)
 
       let filteredData: Prospecto[] = []
       
       if (result.success && result.data) {
         filteredData = result.data
         prospectos.value = result.data
+        console.log('✅ Prospectos loaded:', filteredData.length, 'items')
+      } else {
+        console.warn('⚠️ No data received from API:', result)
       }
 
       // Aplicar filtros
@@ -91,6 +99,7 @@ export function useProspectos() {
       const paginatedData = filteredData.slice(startIndex, endIndex)
 
       prospectos.value = paginatedData
+      console.log('📋 Final prospectos count in reactive ref:', prospectos.value.length)
 
       return handleSupabaseSuccess(paginatedData)
     } catch (err) {
@@ -104,9 +113,16 @@ export function useProspectos() {
   // Obtener un prospecto por ID
   const getProspecto = async (id: string): Promise<ApiResponse<Prospecto>> => {
     try {
-      const prospecto = mockProspectos.value.find(p => p.id === id)
+      // Buscar en la lista actual de prospectos
+      const prospecto = prospectos.value.find(p => p.id === id)
       if (!prospecto) {
-        throw new Error('Prospecto no encontrado')
+        // Si no está en memoria, hacer fetch de todos y buscar
+        await fetchProspectos()
+        const foundProspecto = prospectos.value.find(p => p.id === id)
+        if (!foundProspecto) {
+          throw new Error('Prospecto no encontrado')
+        }
+        return handleSupabaseSuccess(foundProspecto)
       }
       return handleSupabaseSuccess(prospecto)
     } catch (err) {
@@ -172,8 +188,8 @@ export function useProspectos() {
   // Obtener estadísticas de prospectos
   const getStats = async (): Promise<ApiResponse<ProspectoStats>> => {
     try {
-      // Consultar estadísticas del bot
-      const response = await fetch('http://localhost:3001/api/stats')
+      // Consultar estadísticas del dashboard API
+      const response = await fetch('http://localhost:3002/api/stats')
       const result = await response.json()
       
       if (result.success && result.data) {

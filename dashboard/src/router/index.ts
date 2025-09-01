@@ -23,6 +23,14 @@ const routes: RouteRecordRaw[] = [
     }
   },
   {
+    path: '/progressive-capture',
+    name: 'ProgressiveCapture',
+    component: () => import('@/components/prospectos/ProgressiveCaptureView.vue'),
+    meta: {
+      title: 'Progressive Capture - UNIACC ChatBot'
+    }
+  },
+  {
     path: '/metricas',
     name: 'Metricas',
     component: () => import('@/views/MetricasView.vue'),

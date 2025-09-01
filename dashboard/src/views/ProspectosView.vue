@@ -125,7 +125,7 @@
           <tbody class="bg-white divide-y divide-gray-200">
             <tr 
               v-for="prospecto in prospectosStore.prospectos" 
-              :key="prospecto.id"
+              :key="prospecto.whatsapp"
               class="hover:bg-gray-50"
             >
               <td class="px-6 py-4 whitespace-nowrap">
@@ -137,7 +137,7 @@
                 </div>
               </td>
               <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                {{ formatTipoConsulta(prospecto.tipo_consulta) }}
+                {{ formatTipoConsulta((prospecto as any).tipo_consulta_actual || (prospecto as any).tipo_consulta) }}
               </td>
               <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                 {{ prospecto.carrera_interes || 'No especificada' }}
@@ -150,7 +150,7 @@
                   ]">
                     {{ formatStatus(prospecto.estado) }}
                   </span>
-                  <span v-if="prospecto.nivel_interes === 'urgente'" 
+                  <span v-if="(prospecto as any).nivel_interes === 'urgente'" 
                     class="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-red-100 text-red-800 animate-pulse">
                     🚨 URGENTE
                   </span>
@@ -159,13 +159,13 @@
               <td class="px-6 py-4 whitespace-nowrap">
                 <span :class="[
                   'inline-flex px-2 py-1 text-xs font-medium rounded-full',
-                  getSourceColor(prospecto.fuente)
+                  getSourceColor(prospecto.fuente || 'uniacc_chatbot')
                 ]">
-                  {{ formatSource(prospecto.fuente) }}
+                  {{ formatSource(prospecto.fuente || 'uniacc_chatbot') }}
                 </span>
               </td>
               <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                {{ formatDateTimeChile(prospecto.created_at) }}
+                {{ formatDateTimeChile((prospecto as any).primera_interaccion || (prospecto as any).created_at) }}
               </td>
               <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                 <div class="flex justify-end space-x-2">
@@ -182,7 +182,7 @@
                     <Edit class="w-4 h-4" />
                   </button>
                   <button
-                    @click="handleDelete(prospecto.id)"
+                    @click="handleDelete((prospecto as any).whatsapp || prospecto.id)"
                     class="text-red-600 hover:text-red-900"
                   >
                     <Trash2 class="w-4 h-4" />
@@ -258,7 +258,7 @@ const handleFilterChange = () => {
   prospectosStore.applyFilters({
     status: selectedStatus.value,
     source: selectedSource.value,
-    tipo_consulta: selectedTipoConsulta.value
+    // tipo_consulta: selectedTipoConsulta.value  // Temporalmente deshabilitado
   })
 }
 

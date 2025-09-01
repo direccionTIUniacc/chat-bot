@@ -611,27 +611,7 @@ app.get('/api/stats', async (req, res) => {
   }
 })
 
-app.get('/api/conversaciones', async (req, res) => {
-  try {
-    const { supabase } = useSupabase()
-    
-    // Obtener conversaciones desde Supabase
-    const { data: conversaciones, error } = await supabase
-      .from('conversaciones')
-      .select('*')
-      .order('created_at', { ascending: false })
-    
-    if (error) {
-      console.error('❌ Error obteniendo conversaciones:', error)
-      return res.json({ success: true, data: [] })
-    }
-
-    res.json({ success: true, data: conversaciones || [] })
-  } catch (error) {
-    console.error('💥 Error en /api/conversaciones:', error)
-    res.status(500).json({ success: false, error: 'Error interno' })
-  }
-})
+// ENDPOINT ELIMINADO - usando el endpoint completo más abajo
 
 app.get('/api/conversaciones/:id/mensajes', async (req, res) => {
   try {
@@ -708,11 +688,26 @@ app.get('/api/ejecutivos', async (req, res) => {
   }
 })
 
+// Cache simple para conversaciones (5 segundos)
+let conversacionesCache = null
+let lastCacheTime = 0
+const CACHE_DURATION = 10000 // 10 segundos
+
 // 🎯 Endpoint para obtener conversaciones
 app.get('/api/conversaciones', async (req, res) => {
   try {
     const { supabase } = useSupabase()
+    const now = Date.now()
 
+    // Usar cache si está disponible y vigente
+    if (conversacionesCache && (now - lastCacheTime) < CACHE_DURATION) {
+      console.log('📋 Usando conversaciones desde cache')
+      return res.json(conversacionesCache)
+    }
+
+    console.log('📞 Consultando conversaciones desde BD...')
+
+    // Obtener conversaciones y luego buscar prospectos manualmente
     const { data: conversaciones, error } = await supabase
       .from('conversaciones')
       .select(`
@@ -725,16 +720,130 @@ app.get('/api/conversaciones', async (req, res) => {
       throw error
     }
 
-    console.log(`📋 Obteniendo conversaciones: ${conversaciones?.length || 0} encontradas`)
-    console.log('🔍 Asignaciones:', conversaciones?.map(c => ({ 
-      id: c.id.substring(0, 8) + '...', 
-      assigned_to: c.assigned_to ? c.assigned_to.substring(0, 8) + '...' : 'NO_ASIGNADO' 
-    })))
+    // Enriquecer con datos de prospectos buscando por phone_number
+    const conversacionesConProspectos = await Promise.all(
+      (conversaciones || []).map(async (conversacion) => {
+        try {
+          // Buscar prospecto por WhatsApp/teléfono (log reducido)
+          // console.log(`🔍 Buscando prospecto para ${conversacion.id.substring(0, 8)}`)
+          
+          // Intentar búsqueda directa primero
+          let prospecto = null
+          let prospectoError = null
+          
+          // Búsqueda 1: Número exacto como viene
+          const { data: prospectoDirecto, error: errorDirecto } = await supabase
+            .from('prospecto_actual')
+            .select(`
+              whatsapp, 
+              nombre, 
+              email,
+              carrera_interes, 
+              nivel_interes,
+              estado,
+              perfil_usuario,
+              es_prioritario,
+              total_sesiones,
+              tipo_consulta_actual
+            `)
+            .eq('whatsapp', conversacion.phone_number)
+            .maybeSingle()
+            
+          if (prospectoDirecto) {
+            prospecto = prospectoDirecto
+                          // console.log(`✅ Encontrado con búsqueda directa`)
+          } else {
+            // console.log(`❌ No encontrado con búsqueda directa, error:`, errorDirecto?.message)
+            
+            // Búsqueda 2: Limpiar número chileno (quitar +56 o 56 del inicio)
+            let telefonoLimpio = conversacion.phone_number?.replace(/^\+?56/, '')
+            if (telefonoLimpio && telefonoLimpio !== conversacion.phone_number) {
+              const { data: prospectoLimpio, error: errorLimpio } = await supabase
+                .from('prospecto_actual')
+                .select(`
+                  whatsapp, 
+                  nombre, 
+                  email,
+                  carrera_interes, 
+                  nivel_interes,
+                  estado,
+                  perfil_usuario,
+                  es_prioritario,
+                  total_sesiones,
+                  tipo_consulta_actual
+                `)
+                .eq('whatsapp', `56${telefonoLimpio}`)
+                .maybeSingle()
+                
+              if (prospectoLimpio) {
+                prospecto = prospectoLimpio
+                // console.log(`✅ Encontrado con número limpio: 56${telefonoLimpio}`)
+              } else {
+                // console.log(`❌ No encontrado con número limpio, error:`, errorLimpio?.message)
+                prospectoError = errorLimpio
+              }
+            }
+          }
 
-    res.json({
+          // console.log(`📋 Prospecto para ${conversacion.id.substring(0, 8)}: ${prospecto?.nombre || 'No encontrado'}`)
+
+          // Buscar último mensaje de la conversación
+          let ultimoMensaje = null
+          try {
+            const { data: mensaje, error: mensajeError } = await supabase
+              .from('mensajes')
+              .select('content, created_at, type, message_type')
+              .eq('conversacion_id', conversacion.id)
+              .order('created_at', { ascending: false })
+              .limit(1)
+              .maybeSingle()
+              
+            if (mensaje && !mensajeError) {
+              ultimoMensaje = {
+                content: mensaje.content,
+                timestamp: mensaje.created_at,
+                role: mensaje.type, // En BD es 'type', no 'role'
+                message_type: mensaje.message_type
+              }
+              // console.log(`✅ Mensaje: ${mensaje.content.substring(0, 30)}...`)
+            } else {
+              // console.log(`❌ Sin mensaje para ${conversacion.id.substring(0, 8)}`)
+            }
+          } catch (mensajeSearchError) {
+            console.log(`⚠️ Error buscando último mensaje:`, mensajeSearchError.message)
+          }
+
+          return {
+            ...conversacion,
+            prospecto: prospecto || null,
+            last_message: ultimoMensaje?.content || null,
+            last_message_at: ultimoMensaje?.timestamp || conversacion.last_message_at,
+            last_message_role: ultimoMensaje?.role || null
+          }
+        } catch (searchError) {
+          console.log(`⚠️ Error en búsqueda de prospecto:`, searchError.message)
+          return {
+            ...conversacion,
+            prospecto: null,
+            last_message: null
+          }
+        }
+      })
+    )
+
+    console.log(`📋 Conversaciones procesadas: ${conversacionesConProspectos?.length || 0}`)
+    
+    // Preparar respuesta final
+    const respuesta = {
       success: true,
-      data: conversaciones || []
-    })
+      data: conversacionesConProspectos || []
+    }
+    
+    // Guardar en cache
+    conversacionesCache = respuesta
+    lastCacheTime = now
+
+    res.json(respuesta)
 
   } catch (error) {
     console.error('❌ Error obteniendo conversaciones:', error)
@@ -863,6 +972,46 @@ app.post('/api/conversaciones/:id/asignar', async (req, res) => {
 // Health check
 app.get('/health', (req, res) => {
   res.json({ status: 'OK', timestamp: new Date().toISOString() })
+})
+
+// Test endpoint para verificar búsqueda de prospectos
+app.get('/api/test-prospecto/:phone', async (req, res) => {
+  try {
+    const { supabase } = useSupabase()
+    const phone = req.params.phone
+    
+    console.log(`🧪 Test búsqueda prospecto para: ${phone}`)
+    
+    // Búsqueda directa
+    const { data: directa, error: errorDirecta } = await supabase
+      .from('prospecto_actual')
+      .select('whatsapp, nombre, email')
+      .eq('whatsapp', phone)
+      .maybeSingle()
+    
+    // También intentar con LIKE para ver si hay problemas de formato
+    const { data: todos, error: errorTodos } = await supabase
+      .from('prospecto_actual')
+      .select('whatsapp, nombre, email')
+      .limit(5)
+    
+    res.json({
+      phone_buscado: phone,
+      busqueda_directa: {
+        encontrado: !!directa,
+        data: directa,
+        error: errorDirecta?.message
+      },
+      todos_los_prospectos: {
+        total: todos?.length || 0,
+        data: todos,
+        error: errorTodos?.message
+      }
+    })
+  } catch (error) {
+    console.error('❌ Error en test prospecto:', error)
+    res.status(500).json({ error: error.message })
+  }
 })
 
 // Iniciar servidor

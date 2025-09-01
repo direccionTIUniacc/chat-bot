@@ -57,6 +57,9 @@ export const ChatSessionSchema = z.object({
   unread_count: z.number().default(0),
   contact_info: z.record(z.string(), z.any()).optional(),
   
+  // Campos del último mensaje
+  last_message_role: z.string().optional(),
+  
   // Campos originales de Botpress
   messages_count: z.number().default(0),
   duration: z.number().nullable(),

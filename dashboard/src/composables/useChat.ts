@@ -77,12 +77,12 @@ export function useChat() {
 
       if (result.success && result.data) {
         conversaciones.value = result.data
-        console.log('✅ Conversaciones cargadas desde dashboard API:', result.data.length)
-        console.log('🔍 Estados de asignación:', result.data.map(c => ({
-          id: c.id?.substring(0, 8) + '...',
-          assigned_to: c.assigned_to ? c.assigned_to.substring(0, 8) + '...' : 'NO_ASIGNADO',
-          handoff_status: c.handoff_status || 'sin_handoff'
-        })))
+        console.log(`✅ Conversaciones cargadas: ${result.data.length} encontradas`)
+        // Logs de debug comentados para reducir spam
+        // console.log('🔍 Estados de asignación:', result.data.map(c => ({
+        //   id: c.id?.substring(0, 8) + '...',
+        //   assigned_to: c.assigned_to ? c.assigned_to.substring(0, 8) + '...' : 'NO_ASIGNADO'
+        // })))
       } else {
         console.error('❌ Error cargando conversaciones:', result.error)
         conversaciones.value = []
@@ -271,16 +271,40 @@ export function useChat() {
   }
 
   const getContactName = (conversacion: ChatSession): string => {
-    // 🆕 Mapear campos del chatbot
-    if ((conversacion as any).contact_name) {
-      return (conversacion as any).contact_name
+    // Obtener datos disponibles
+    const nombre = (conversacion as any).prospecto?.nombre
+    const telefono = (conversacion as any).phone_number
+    
+    // 1️⃣ Si tenemos nombre real del prospecto
+    if (nombre && nombre !== 'Usuario WhatsApp') {
+      // Con teléfono: "Juan Pérez (91234567)"
+      if (telefono && /^\d+$/.test(telefono)) {
+        const telefonoLimpio = telefono.replace(/^\+?56/, '').replace(/^56/, '')
+        return `${nombre} (${telefonoLimpio})`
+      }
+      // Solo nombre: "Juan Pérez"
+      return nombre
     }
-    // Intentar obtener nombre del prospecto si está relacionado
-    if ((conversacion as any).prospecto?.nombre) {
-      return (conversacion as any).prospecto.nombre
+    
+    // 2️⃣ Si tenemos teléfono que parece real (solo números)
+    if (telefono && /^\d+$/.test(telefono)) {
+      const telefonoLimpio = telefono.replace(/^\+?56/, '').replace(/^56/, '')
+      if (telefonoLimpio.length >= 8) {
+        return `+56 ${telefonoLimpio.substring(0, 1)} ${telefonoLimpio.substring(1, 5)} ${telefonoLimpio.substring(5)}`
+      }
+      return `Usuario ${telefonoLimpio}`
     }
-    // Fallback al phone_number o external_id
-    return (conversacion as any).phone_number || (conversacion as any).external_id || 'Usuario sin nombre'
+    
+    // 3️⃣ Teléfono que parece ID de test
+    if (telefono) {
+      if (telefono.includes('test') || telefono.includes('menu')) {
+        return `Sesión Test (${telefono.substring(0, 15)}...)`
+      }
+      return `ID: ${telefono.substring(0, 20)}...`
+    }
+    
+    // 4️⃣ Fallback final
+    return 'Prospecto Anónimo'
   }
 
   const getEjecutivoNombre = (ejecutivoId: string | null | undefined): string => {

@@ -97,6 +97,46 @@
                 </span>
               </div>
 
+              <!-- Información del prospecto -->
+              <div v-if="conversacion.prospecto" class="flex items-center space-x-2 mb-2">
+                <!-- Carrera de interés -->
+                <span 
+                  v-if="conversacion.prospecto.carrera_interes && conversacion.prospecto.carrera_interes !== 'Sin especificar'"
+                  class="inline-flex items-center px-2 py-0.5 text-xs font-medium bg-blue-100 text-blue-800 rounded-full"
+                >
+                  🎓 {{ conversacion.prospecto.carrera_interes }}
+                </span>
+                
+                <!-- Nivel de interés -->
+                <span 
+                  v-if="conversacion.prospecto.nivel_interes"
+                  :class="{
+                    'bg-green-100 text-green-800': conversacion.prospecto.nivel_interes === 'alto' || conversacion.prospecto.nivel_interes === 'muy_alto',
+                    'bg-yellow-100 text-yellow-800': conversacion.prospecto.nivel_interes === 'medio',
+                    'bg-gray-100 text-gray-800': conversacion.prospecto.nivel_interes === 'bajo'
+                  }"
+                  class="inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full"
+                >
+                  📊 {{ conversacion.prospecto.nivel_interes }}
+                </span>
+
+                <!-- Estado prioritario -->
+                <span 
+                  v-if="conversacion.prospecto.es_prioritario"
+                  class="inline-flex items-center px-2 py-0.5 text-xs font-medium bg-red-100 text-red-800 rounded-full"
+                >
+                  🔥 Prioritario
+                </span>
+
+                <!-- Perfil de usuario -->
+                <span 
+                  v-if="conversacion.prospecto.perfil_usuario"
+                  class="inline-flex items-center px-2 py-0.5 text-xs font-medium bg-purple-100 text-purple-800 rounded-full"
+                >
+                  👤 {{ conversacion.prospecto.perfil_usuario.replace(/_/g, ' ') }}
+                </span>
+              </div>
+
               <!-- Último mensaje -->
               <p class="text-sm text-gray-600 truncate mb-2">
                 {{ getUltimoMensaje(conversacion) }}
@@ -468,15 +508,38 @@ const scrollToBottom = async () => {
 
 // Utilidades
 const getUltimoMensaje = (conversacion: ChatSession): string => {
+  // Usar el last_message que viene del servidor
+  if (conversacion.last_message && conversacion.last_message.trim()) {
+    // Agregar prefijo según el rol
+    const prefijo = conversacion.last_message_role === 'user' ? '👤 ' : 
+                   conversacion.last_message_role === 'assistant' ? '🤖 ' : 
+                   conversacion.last_message_role === 'system' ? '⚙️ ' : 
+                   ''
+    
+    // Truncar mensaje si es muy largo
+    const mensaje = conversacion.last_message.length > 60 
+      ? conversacion.last_message.substring(0, 60) + '...'
+      : conversacion.last_message
+    
+    return `${prefijo}${mensaje}`
+  }
+  
+  // Fallback: intentar buscar en mensajes cargados
   const mensajes = chat.mensajes.value[conversacion.id]
-  if (!mensajes || mensajes.length === 0) return 'Sin mensajes'
+  if (mensajes && mensajes.length > 0) {
+    const ultimo = mensajes[mensajes.length - 1]
+    const prefijo = ultimo.type === 'user' ? '👤 ' : 
+                   ultimo.type === 'bot' ? '🤖 ' : 
+                   `${ultimo.sender_name}: `
+    
+    const mensaje = ultimo.content.length > 60 
+      ? ultimo.content.substring(0, 60) + '...'
+      : ultimo.content
+    
+    return `${prefijo}${mensaje}`
+  }
   
-  const ultimo = mensajes[mensajes.length - 1]
-  const prefijo = ultimo.type === 'user' ? '' : 
-                 ultimo.type === 'bot' ? '🤖 ' : 
-                 `${ultimo.sender_name}: `
-  
-  return `${prefijo}${ultimo.content}`
+  return 'Sin mensajes recientes'
 }
 
 const getEstadoColor = (conversacion: ChatSession): string => {

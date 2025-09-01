@@ -59,9 +59,14 @@
 
     <!-- Panel de asignaciones rápidas -->
     <div v-if="chat.conversacionesPendientes && chat.conversacionesPendientes.value && chat.conversacionesPendientes.value.length > 0" class="card p-6">
-      <h3 class="text-lg font-semibold text-gray-900 mb-4">
-        🚨 Conversaciones sin asignar ({{ chat.conversacionesPendientes.value.length }})
-      </h3>
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="text-lg font-semibold text-gray-900">
+          🚨 Conversaciones sin asignar ({{ chat.conversacionesPendientes.value.length }})
+        </h3>
+        <div class="text-sm text-orange-600 bg-orange-100 px-3 py-1 rounded-full">
+          ⚡ Requieren asignación inmediata
+        </div>
+      </div>
       
       <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         <div
@@ -94,15 +99,15 @@
           <div class="flex space-x-2">
             <select
               @change="asignarRapido(conversacion.id, ($event.target as HTMLSelectElement).value)"
-              class="flex-1 text-xs border border-gray-300 rounded px-2 py-1"
+              class="flex-1 text-xs border-2 border-orange-300 bg-orange-50 text-orange-800 rounded px-2 py-1 font-semibold focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
             >
-              <option value="">Asignar a...</option>
+              <option value="">🎯 Asignar a ejecutivo...</option>
               <option
                 v-for="ejecutivo in ejecutivos.ejecutivosDisponibles.value"
                 :key="ejecutivo.id"
                 :value="ejecutivo.id"
               >
-                {{ ejecutivo.nombre }}
+                👤 {{ ejecutivo.nombre }}
               </option>
             </select>
             
@@ -196,7 +201,30 @@ const getUltimoMensaje = (conversacion: ChatSession): string => {
 const asignarRapido = async (conversacionId: string, ejecutivoId: string) => {
   if (!ejecutivoId) return
   
-  await chat.asignarConversacion(conversacionId, ejecutivoId)
+  try {
+    console.log(`🎯 Asignando conversación ${conversacionId} a ejecutivo ${ejecutivoId}`)
+    
+    const result = await chat.asignarConversacion(conversacionId, ejecutivoId, {
+      manual: true,
+      priority: 'normal'
+    })
+    
+    if (result.success) {
+      console.log('✅ Asignación exitosa:', result.data)
+      
+      // 🔄 Recargar conversaciones para actualizar la UI
+      await chat.inicializar()
+      
+      // Mostrar notificación de éxito
+      alert(`✅ Conversación asignada exitosamente a ${result.data.ejecutivo_asignado?.nombre || 'ejecutivo'}`)
+    } else {
+      console.error('❌ Error en asignación:', result.error)
+      alert(`Error al asignar: ${result.error}`)
+    }
+  } catch (error) {
+    console.error('❌ Error inesperado:', error)
+    alert(`Error inesperado: ${error}`)
+  }
 }
 
 // Métodos de respuesta rápida

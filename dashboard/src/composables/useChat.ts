@@ -6,7 +6,8 @@ import type {
   ChatSession, 
   Prospecto,
   Ejecutivo,
-  ApiResponse 
+  ApiResponse,
+  AsignacionResult 
 } from '@/types'
 
 export function useChat() {
@@ -36,9 +37,25 @@ export function useChat() {
   const conversacionesActivas = computed(() => 
     conversaciones.value.filter(c => c.status === 'active')
   )
-  const conversacionesPendientes = computed(() => 
-    conversaciones.value.filter(c => !c.assigned_to)
-  )
+  const conversacionesPendientes = computed(() => {
+    const pendientes = conversaciones.value.filter(c => {
+      const sinAsignar = !c.assigned_to || c.assigned_to === null || c.assigned_to === ''
+      const handoffBot = c.handoff_status === 'bot' || !c.handoff_status
+      return sinAsignar && handoffBot
+    })
+    
+    console.log('🔍 Filtro conversacionesPendientes:', {
+      total: conversaciones.value.length,
+      pendientes: pendientes.length,
+      detalle: pendientes.map(c => ({
+        id: c.id?.substring(0, 8) + '...',
+        assigned_to: c.assigned_to || 'null',
+        handoff_status: c.handoff_status || 'null'
+      }))
+    })
+    
+    return pendientes
+  })
   const totalMensajesNoLeidos = computed(() => 
     Object.values(mensajesNoLeidos.value).reduce((sum, count) => sum + count, 0)
   )
@@ -49,13 +66,23 @@ export function useChat() {
       loading.value = true
       error.value = null
 
-      // Cargar conversaciones desde el chatbot
-      const response = await fetch('http://localhost:3001/api/conversaciones')
+      // 1️⃣ Primero cargar ejecutivos para que estén disponibles
+      console.log('🔄 Cargando ejecutivos primero...')
+      await ejecutivos.fetchEjecutivos()
+      console.log('✅ Ejecutivos cargados para useChat:', ejecutivos.ejecutivos.value.length)
+
+      // 2️⃣ Luego cargar conversaciones
+      const response = await fetch('http://localhost:3002/api/conversaciones')
       const result = await response.json()
 
       if (result.success && result.data) {
         conversaciones.value = result.data
-        console.log('✅ Conversaciones cargadas desde chatbot:', result.data.length)
+        console.log('✅ Conversaciones cargadas desde dashboard API:', result.data.length)
+        console.log('🔍 Estados de asignación:', result.data.map(c => ({
+          id: c.id?.substring(0, 8) + '...',
+          assigned_to: c.assigned_to ? c.assigned_to.substring(0, 8) + '...' : 'NO_ASIGNADO',
+          handoff_status: c.handoff_status || 'sin_handoff'
+        })))
       } else {
         console.error('❌ Error cargando conversaciones:', result.error)
         conversaciones.value = []
@@ -79,8 +106,8 @@ export function useChat() {
         return handleSupabaseSuccess(mensajes.value[sessionId])
       }
 
-      // Cargar mensajes desde el chatbot
-      const response = await fetch(`http://localhost:3001/api/conversaciones/${sessionId}/mensajes`)
+      // Cargar mensajes desde el dashboard API
+      const response = await fetch(`http://localhost:3002/api/conversaciones/${sessionId}/mensajes`)
       const result = await response.json()
 
       if (result.success && result.data) {
@@ -140,20 +167,94 @@ export function useChat() {
     }
   }
 
-  // Asignar conversación a ejecutivo
+  // 🎯 Asignar conversación a ejecutivo con persistencia completa
   const asignarConversacion = async (
     sessionId: string, 
-    ejecutivoId: string
-  ): Promise<ApiResponse<boolean>> => {
+    ejecutivoId: string,
+    metadata?: {
+      manual?: boolean
+      priority?: 'low' | 'normal' | 'high' | 'urgent'
+      notes?: string
+    }
+  ): Promise<ApiResponse<AsignacionResult>> => {
     try {
+      loading.value = true
+      error.value = null
+
+      // 1️⃣ Validar que la conversación existe
       const conversacion = conversaciones.value.find(c => c.id === sessionId)
-      if (conversacion) {
-        conversacion.assigned_to = ejecutivoId
+      if (!conversacion) {
+        throw new Error(`Conversación ${sessionId} no encontrada`)
       }
 
-      return handleSupabaseSuccess(true)
-    } catch (err) {
+      // 2️⃣ Llamar al endpoint de asignación
+      const response = await fetch(`http://localhost:3002/api/conversaciones/${sessionId}/asignar`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          ejecutivoId,
+          priority: metadata?.priority,
+          notes: metadata?.notes
+        })
+      })
+
+      const result = await response.json()
+
+      if (!result.success) {
+        throw new Error(result.error || 'Error en asignación')
+      }
+
+      // 3️⃣ Actualizar estado local reactivo
+      const localConversacion = conversaciones.value.find(c => c.id === sessionId)
+      if (localConversacion) {
+        localConversacion.assigned_to = ejecutivoId
+        localConversacion.handoff_status = 'agent'
+        localConversacion.handoff_accepted_at = new Date().toISOString()
+        localConversacion.agent_last_activity = new Date().toISOString()
+      }
+
+      console.log(`✅ Conversación ${sessionId} asignada a ejecutivo ${ejecutivoId}`)
+
+      return handleSupabaseSuccess(result.data)
+
+    } catch (err: any) {
+      error.value = err.message || 'Error al asignar conversación'
+      console.error('❌ Error en asignarConversacion:', err)
       return handleSupabaseError(err)
+    } finally {
+      loading.value = false
+    }
+  }
+
+  // 🤖 Obtener contexto de handoff para ejecutivo
+  const obtenerContextoHandoff = async (sessionId: string): Promise<any> => {
+    try {
+      // Obtener información del prospecto
+      const conversacion = conversaciones.value.find(c => c.id === sessionId)
+      if (!conversacion || !conversacion.prospecto_id) {
+        return null
+      }
+
+      // Buscar en prospecto_actual
+      const { data: prospecto } = await supabase
+        .from('prospecto_actual')
+        .select('*')
+        .eq('whatsapp', conversacion.prospecto_id)
+        .single()
+
+      // Obtener últimos mensajes
+      const mensajesRecientes = mensajes.value[sessionId]?.slice(-10) || []
+
+      return {
+        prospecto,
+        mensajes_recientes: mensajesRecientes,
+        resumen_sesion: `Prospecto interesado en ${(prospecto as any)?.carrera_interes || 'información general'}`
+      }
+    } catch (err) {
+      console.warn('⚠️ Error obteniendo contexto de handoff:', err)
+      return null
     }
   }
 
@@ -182,9 +283,13 @@ export function useChat() {
     return (conversacion as any).phone_number || (conversacion as any).external_id || 'Usuario sin nombre'
   }
 
-  const getEjecutivoNombre = (ejecutivoId: string): string => {
+  const getEjecutivoNombre = (ejecutivoId: string | null | undefined): string => {
+    if (!ejecutivoId || ejecutivoId === 'null' || ejecutivoId === '') {
+      return 'Sin asignar'
+    }
+    
     const ejecutivo = ejecutivos.ejecutivos.value.find(e => e.id === ejecutivoId)
-    return ejecutivo?.nombre || 'Sin asignar'
+    return ejecutivo?.nombre || `Ejecutivo ${ejecutivoId.substring(0, 8)}...`
   }
 
   // 🕐 Formatear tiempo en zona horaria de Chile
@@ -244,6 +349,7 @@ export function useChat() {
     obtenerMensajes,
     enviarMensaje,
     asignarConversacion,
+    obtenerContextoHandoff,
     marcarComoLeida,
 
     // Métodos auxiliares

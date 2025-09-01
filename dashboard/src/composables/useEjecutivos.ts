@@ -49,7 +49,7 @@ export function useEjecutivos() {
   // Datos mock para desarrollo
   const mockEjecutivos: Ejecutivo[] = [
     {
-      id: '1',
+      id: '550e8400-e29b-41d4-a716-446655440001',
       nombre: 'María González',
       email: 'maria.gonzalez@uniacc.cl',
       telefono: '+56912345678',
@@ -77,7 +77,7 @@ export function useEjecutivos() {
       ultimo_acceso: '2024-01-22T15:30:00Z'
     },
     {
-      id: '2',
+      id: '550e8400-e29b-41d4-a716-446655440002',
       nombre: 'Carlos Mendoza',
       email: 'carlos.mendoza@uniacc.cl',
       telefono: '+56987654321',
@@ -140,14 +140,25 @@ export function useEjecutivos() {
       loading.value = true
       error.value = null
 
-      // Por ahora usar datos mock
-      await new Promise(resolve => setTimeout(resolve, 500))
-      ejecutivos.value = mockEjecutivos
+      // Obtener ejecutivos desde la API
+      const response = await fetch('http://localhost:3002/api/ejecutivos')
+      const result = await response.json()
 
-      return handleSupabaseSuccess(mockEjecutivos)
+      if (result.success && result.data) {
+        ejecutivos.value = result.data
+        console.log('✅ Ejecutivos cargados desde API:', result.data.length)
+        return handleSupabaseSuccess(result.data)
+      } else {
+        // Si no hay ejecutivos en la BD, usar mock
+        console.log('⚠️ No hay ejecutivos en BD, usando datos mock')
+        ejecutivos.value = mockEjecutivos
+        return handleSupabaseSuccess(mockEjecutivos)
+      }
     } catch (err) {
-      error.value = 'Error al cargar ejecutivos'
-      return handleSupabaseError(err)
+      console.log('⚠️ Error con API, usando datos mock:', err)
+      // Fallback a datos mock si hay error
+      ejecutivos.value = mockEjecutivos
+      return handleSupabaseSuccess(mockEjecutivos)
     } finally {
       loading.value = false
     }

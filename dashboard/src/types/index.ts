@@ -12,6 +12,25 @@ export interface ApiResponse<T> {
   success: boolean
 }
 
+// 🎯 Tipos para sistema de asignación
+export interface AsignacionResult {
+  conversacion_id: string
+  ejecutivo_asignado: {
+    id: string
+    nombre: string
+    email: string
+    avatar_url?: string
+  }
+  prospecto_info: {
+    whatsapp: string
+    nombre: string
+    carrera_interes: string
+    nivel_interes: string
+  }
+  handoff_timestamp: string
+  context_transferido: boolean
+}
+
 export interface PaginationMeta {
   page: number
   pageSize: number

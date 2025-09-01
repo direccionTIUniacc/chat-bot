@@ -2,6 +2,7 @@ const express = require('express')
 const cors = require('cors')
 const { createClient } = require('@supabase/supabase-js')
 
+
 const app = express()
 const PORT = 3002 // Puerto para API (dashboard frontend está en 3000)
 
@@ -239,7 +240,7 @@ app.post('/api/prospectos', async (req, res) => {
           .select('id')
           .single()
 
-        if (error) throw error
+      if (error) throw error
         result = data
         
       } else {
@@ -356,18 +357,18 @@ app.post('/api/botpress-webhook', async (req, res) => {
       p_nivel_interes: determinarNivelInteres(tipoConsulta, eventData.nivel_interes),
       p_fuente: eventData.source || 'uniacc_chatbot',
       p_datos_capturados: JSON.stringify({
-        bot_source: 'uniacc_direct',
-        conversation_flow: eventData.flujo_actual,
-        utm_source: eventData.utm_source,
-        utm_medium: eventData.utm_medium,
-        utm_campaign: eventData.utm_campaign,
+          bot_source: 'uniacc_direct',
+          conversation_flow: eventData.flujo_actual,
+          utm_source: eventData.utm_source,
+          utm_medium: eventData.utm_medium,
+          utm_campaign: eventData.utm_campaign,
         timestamp: eventData.timestamp,
-        ...eventData.datos_adicionales
+          ...eventData.datos_adicionales
       }),
       p_mensajes: 1,
       p_flujo_completado: true,
       p_razon_finalizacion: 'completado'
-    })
+      })
 
     if (error) {
       console.error('❌ Error creando prospecto UNIACC:', error)
@@ -378,15 +379,15 @@ app.post('/api/botpress-webhook', async (req, res) => {
     
     // Crear notificación para ejecutivos (opcional, solo si existe tabla notificaciones)
     try {
-      await supabase
-        .from('notificaciones')
-        .insert({
-          tipo: 'nuevo_prospecto',
+    await supabase
+      .from('notificaciones')
+      .insert({
+        tipo: 'nuevo_prospecto',
           titulo: `Nuevo prospecto: ${eventData.nombre}`,
           mensaje: `Interesado en ${eventData.carrera_interes || 'consulta general'}`,
           datos: { whatsapp: eventData.whatsapp },
-          created_at: new Date()
-        })
+        created_at: new Date()
+      })
     } catch (notifError) {
       // No es crítico si falla la notificación
       console.warn('⚠️ No se pudo crear notificación:', notifError.message)
@@ -678,6 +679,187 @@ app.get('/api/prospectos', async (req, res) => {
   }
 })
 
+// 📋 Endpoint para obtener ejecutivos
+app.get('/api/ejecutivos', async (req, res) => {
+  try {
+    const { supabase } = useSupabase()
+
+    const { data: ejecutivos, error } = await supabase
+      .from('ejecutivos')
+      .select('*')
+      .eq('activo', true)
+      .order('nombre')
+
+    if (error) {
+      throw error
+    }
+
+    res.json({
+      success: true,
+      data: ejecutivos || []
+    })
+
+  } catch (error) {
+    console.error('❌ Error obteniendo ejecutivos:', error)
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Error interno del servidor'
+    })
+  }
+})
+
+// 🎯 Endpoint para obtener conversaciones
+app.get('/api/conversaciones', async (req, res) => {
+  try {
+    const { supabase } = useSupabase()
+
+    const { data: conversaciones, error } = await supabase
+      .from('conversaciones')
+      .select(`
+        *,
+        ejecutivo:ejecutivos(id, nombre, email)
+      `)
+      .order('last_message_at', { ascending: false })
+
+    if (error) {
+      throw error
+    }
+
+    console.log(`📋 Obteniendo conversaciones: ${conversaciones?.length || 0} encontradas`)
+    console.log('🔍 Asignaciones:', conversaciones?.map(c => ({ 
+      id: c.id.substring(0, 8) + '...', 
+      assigned_to: c.assigned_to ? c.assigned_to.substring(0, 8) + '...' : 'NO_ASIGNADO' 
+    })))
+
+    res.json({
+      success: true,
+      data: conversaciones || []
+    })
+
+  } catch (error) {
+    console.error('❌ Error obteniendo conversaciones:', error)
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Error interno del servidor'
+    })
+  }
+})
+
+// 💬 Endpoint para obtener mensajes de una conversación
+app.get('/api/conversaciones/:id/mensajes', async (req, res) => {
+  try {
+    const { id: conversacionId } = req.params
+    const { supabase } = useSupabase()
+
+    const { data: mensajes, error } = await supabase
+      .from('mensajes')
+      .select('*')
+      .eq('conversacion_id', conversacionId)
+      .order('created_at', { ascending: true })
+
+    if (error) {
+      throw error
+    }
+
+    res.json({
+      success: true,
+      data: mensajes || []
+    })
+
+  } catch (error) {
+    console.error('❌ Error obteniendo mensajes:', error)
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Error interno del servidor'
+    })
+  }
+})
+
+// 🎯 Endpoint para asignar conversación a ejecutivo
+app.post('/api/conversaciones/:id/asignar', async (req, res) => {
+  try {
+    const { id: conversacionId } = req.params
+    const { ejecutivoId, priority, notes } = req.body
+
+    console.log(`🎯 Asignando conversación ${conversacionId} a ejecutivo ${ejecutivoId}`)
+
+    const { supabase } = useSupabase()
+    console.log('📊 Supabase client created:', !!supabase)
+
+    // 1️⃣ Actualizar conversación
+    const { data: conversacion, error: updateError } = await supabase
+      .from('conversaciones')
+      .update({
+        assigned_to: ejecutivoId,
+        handoff_status: 'agent',
+        handoff_accepted_at: new Date().toISOString(),
+        agent_last_activity: new Date().toISOString(),
+        priority: priority || 'normal',
+        notas: notes || null,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', conversacionId)
+      .select(`
+        *,
+        ejecutivo:ejecutivos(id, nombre, email, avatar_url),
+        prospecto:prospecto_actual(whatsapp, nombre, carrera_interes, nivel_interes)
+      `)
+      .single()
+
+    if (updateError) {
+      throw updateError
+    }
+
+    // 2️⃣ Enviar mensaje de transición
+    const mensajeTransicion = {
+      conversacion_id: conversacionId,
+      type: 'bot',
+      content: `🔄 Te he conectado con ${conversacion.ejecutivo.nombre}, uno de nuestros asesores especializados. En un momento te atenderá para resolver todas tus consultas. ¡Gracias por tu paciencia! 😊`,
+      message_type: 'text',
+      sender_name: 'UNIACC Bot',
+      metadata: {
+        is_transition: true,
+        ejecutivo_asignado: ejecutivoId,
+        timestamp_handoff: new Date().toISOString()
+      }
+    }
+
+    const { error: messageError } = await supabase
+      .from('mensajes')
+      .insert(mensajeTransicion)
+
+    if (messageError) {
+      console.warn('⚠️ No se pudo enviar mensaje de transición:', messageError)
+    }
+
+    // 3️⃣ Respuesta exitosa
+    console.log('✅ Asignación completada. Datos de respuesta:', {
+      conversacion_id: conversacionId,
+      ejecutivo_asignado: conversacion.ejecutivo,
+      handoff_timestamp: conversacion.handoff_accepted_at
+    })
+
+    res.json({
+      success: true,
+      data: {
+        conversacion_id: conversacionId,
+        ejecutivo_asignado: conversacion.ejecutivo,
+        prospecto_info: conversacion.prospecto,
+        handoff_timestamp: conversacion.handoff_accepted_at,
+        context_transferido: true
+      }
+    })
+
+  } catch (error) {
+    console.error('❌ Error asignando conversación:', error)
+    console.error('📋 Error stack:', error.stack)
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Error interno del servidor'
+    })
+  }
+})
+
 // Health check
 app.get('/health', (req, res) => {
   res.json({ status: 'OK', timestamp: new Date().toISOString() })
@@ -687,6 +869,10 @@ app.get('/health', (req, res) => {
 app.listen(PORT, () => {
   console.log(`🚀 Dashboard API Server running on http://localhost:${PORT}`)
   console.log(`📋 Endpoints:`)
+  console.log(`   GET  /api/ejecutivos - Obtener ejecutivos`)
+  console.log(`   GET  /api/conversaciones - Obtener conversaciones`)
+  console.log(`   GET  /api/conversaciones/:id/mensajes - Obtener mensajes de conversación`)
+  console.log(`   POST /api/conversaciones/:id/asignar - Asignar conversación a ejecutivo`)
   console.log(`   POST /api/interacciones - Registro de interacciones del chatbot`)
   console.log(`   POST /api/botpress-webhook - Webhook de Botpress`)
   console.log(`   GET  /health - Health check`)

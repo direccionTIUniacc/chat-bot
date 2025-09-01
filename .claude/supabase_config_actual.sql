@@ -50,104 +50,6 @@ grant delete, insert, references, select, trigger, truncate, update on ejecutivo
 
 grant delete, insert, references, select, trigger, truncate, update on ejecutivos to service_role;
 
-create table conversaciones
-(
-    id              uuid                     default gen_random_uuid() not null
-        primary key,
-    created_at      timestamp with time zone default now(),
-    updated_at      timestamp with time zone default now(),
-    external_id     text
-        unique,
-    phone_number    text                                               not null,
-    contact_name    text,
-    prospecto_id    uuid
-        references ??? (),
-    assigned_to     uuid
-        references ejecutivos,
-    status          text                     default 'active'::text
-        constraint conversaciones_status_check
-            check (status = ANY (ARRAY ['active'::text, 'paused'::text, 'closed'::text, 'archived'::text])),
-    last_message_at timestamp with time zone default now(),
-    message_count   integer                  default 0,
-    unread_count    integer                  default 0,
-    contact_info    jsonb                    default '{}'::jsonb,
-    tags            text[]                   default '{}'::text[],
-    priority        text                     default 'normal'::text
-        constraint conversaciones_priority_check
-            check (priority = ANY (ARRAY ['low'::text, 'normal'::text, 'high'::text, 'urgent'::text])),
-    notas           text
-);
-
-alter table conversaciones
-    owner to postgres;
-
-create index idx_conversaciones_phone
-    on conversaciones (phone_number);
-
-create index idx_conversaciones_prospecto
-    on conversaciones (prospecto_id);
-
-create index idx_conversaciones_asignado
-    on conversaciones (assigned_to);
-
-create index idx_conversaciones_status
-    on conversaciones (status);
-
-create index idx_conversaciones_last_message
-    on conversaciones (last_message_at);
-
-grant delete, insert, references, select, trigger, truncate, update on conversaciones to anon;
-
-grant delete, insert, references, select, trigger, truncate, update on conversaciones to authenticated;
-
-grant delete, insert, references, select, trigger, truncate, update on conversaciones to service_role;
-
-create table mensajes
-(
-    id              uuid                     default gen_random_uuid() not null
-        primary key,
-    created_at      timestamp with time zone default now(),
-    conversacion_id uuid
-        references conversaciones
-            on delete cascade,
-    external_id     text,
-    content         text                                               not null,
-    message_type    text                     default 'text'::text
-        constraint mensajes_message_type_check
-            check (message_type = ANY
-                   (ARRAY ['text'::text, 'image'::text, 'document'::text, 'audio'::text, 'video'::text, 'location'::text, 'contact'::text])),
-    type            text                                               not null
-        constraint mensajes_type_check
-            check (type = ANY (ARRAY ['user'::text, 'bot'::text, 'agent'::text])),
-    sender_id       text,
-    sender_name     text,
-    is_read         boolean                  default false,
-    delivered_at    timestamp with time zone,
-    read_at         timestamp with time zone,
-    metadata        jsonb                    default '{}'::jsonb
-);
-
-alter table mensajes
-    owner to postgres;
-
-create index idx_mensajes_conversacion
-    on mensajes (conversacion_id);
-
-create index idx_mensajes_created_at
-    on mensajes (created_at);
-
-create index idx_mensajes_type
-    on mensajes (type);
-
-create index idx_mensajes_read
-    on mensajes (is_read);
-
-grant delete, insert, references, select, trigger, truncate, update on mensajes to anon;
-
-grant delete, insert, references, select, trigger, truncate, update on mensajes to authenticated;
-
-grant delete, insert, references, select, trigger, truncate, update on mensajes to service_role;
-
 create table automatizaciones
 (
     id              uuid                     default gen_random_uuid() not null
@@ -383,6 +285,117 @@ comment on constraint prospecto_actual_estado_check on prospecto_actual is 'Esta
 
 alter table prospecto_actual
     owner to postgres;
+
+create table conversaciones
+(
+    id                   uuid                     default gen_random_uuid() not null
+        primary key,
+    created_at           timestamp with time zone default now(),
+    updated_at           timestamp with time zone default now(),
+    external_id          text
+        unique,
+    phone_number         text                                               not null,
+    contact_name         text,
+    prospecto_id         text
+        references prospecto_actual,
+    assigned_to          uuid
+        references ejecutivos,
+    status               text                     default 'active'::text
+        constraint conversaciones_status_check
+            check (status = ANY (ARRAY ['active'::text, 'paused'::text, 'closed'::text, 'archived'::text])),
+    last_message_at      timestamp with time zone default now(),
+    message_count        integer                  default 0,
+    unread_count         integer                  default 0,
+    contact_info         jsonb                    default '{}'::jsonb,
+    tags                 text[]                   default '{}'::text[],
+    priority             text                     default 'normal'::text
+        constraint conversaciones_priority_check
+            check (priority = ANY (ARRAY ['low'::text, 'normal'::text, 'high'::text, 'urgent'::text])),
+    notas                text,
+    handoff_status       text                     default 'bot'::text
+        constraint conversaciones_handoff_status_check
+            check (handoff_status = ANY (ARRAY ['bot'::text, 'queued'::text, 'agent'::text, 'resolved'::text])),
+    handoff_requested_at timestamp with time zone,
+    handoff_accepted_at  timestamp with time zone,
+    agent_last_activity  timestamp with time zone
+);
+
+alter table conversaciones
+    owner to postgres;
+
+create index idx_conversaciones_phone
+    on conversaciones (phone_number);
+
+create index idx_conversaciones_asignado
+    on conversaciones (assigned_to);
+
+create index idx_conversaciones_status
+    on conversaciones (status);
+
+create index idx_conversaciones_last_message
+    on conversaciones (last_message_at);
+
+create index idx_conversaciones_prospecto
+    on conversaciones (prospecto_id);
+
+create index idx_conversaciones_handoff_status
+    on conversaciones (handoff_status, handoff_requested_at);
+
+create index idx_conversaciones_ejecutivo_activo
+    on conversaciones (assigned_to, status)
+    where ((assigned_to IS NOT NULL) AND (status = 'active'::text));
+
+grant delete, insert, references, select, trigger, truncate, update on conversaciones to anon;
+
+grant delete, insert, references, select, trigger, truncate, update on conversaciones to authenticated;
+
+grant delete, insert, references, select, trigger, truncate, update on conversaciones to service_role;
+
+create table mensajes
+(
+    id              uuid                     default gen_random_uuid() not null
+        primary key,
+    created_at      timestamp with time zone default now(),
+    conversacion_id uuid
+        references conversaciones
+            on delete cascade,
+    external_id     text,
+    content         text                                               not null,
+    message_type    text                     default 'text'::text
+        constraint mensajes_message_type_check
+            check (message_type = ANY
+                   (ARRAY ['text'::text, 'image'::text, 'document'::text, 'audio'::text, 'video'::text, 'location'::text, 'contact'::text])),
+    type            text                                               not null
+        constraint mensajes_type_check
+            check (type = ANY (ARRAY ['user'::text, 'bot'::text, 'agent'::text])),
+    sender_id       text,
+    sender_name     text,
+    is_read         boolean                  default false,
+    delivered_at    timestamp with time zone,
+    read_at         timestamp with time zone,
+    metadata        jsonb                    default '{}'::jsonb
+);
+
+alter table mensajes
+    owner to postgres;
+
+create index idx_mensajes_conversacion
+    on mensajes (conversacion_id);
+
+create index idx_mensajes_created_at
+    on mensajes (created_at);
+
+create index idx_mensajes_type
+    on mensajes (type);
+
+create index idx_mensajes_read
+    on mensajes (is_read);
+
+grant delete, insert, references, select, trigger, truncate, update on mensajes to anon;
+
+grant delete, insert, references, select, trigger, truncate, update on mensajes to authenticated;
+
+grant delete, insert, references, select, trigger, truncate, update on mensajes to service_role;
 
 create index idx_actual_prioridad
     on prospecto_actual (es_prioritario, nivel_interes, ultima_interaccion);
@@ -955,4 +968,40 @@ $$;
 comment on function insertar_sesion_prospecto(text, text, text, text, integer, text, text, text, text, text, text, jsonb, interval, integer, boolean, text, text, jsonb) is 'Función híbrida: inserta en historial + mantiene prospecto_actual actualizado. Sin triggers externos.';
 
 alter function insertar_sesion_prospecto(text, text, text, text, integer, text, text, text, text, text, text, jsonb, interval, integer, boolean, text, text, jsonb) owner to postgres;
+
+create function sync_conversacion_prospecto() returns trigger
+    language plpgsql
+as
+$$
+BEGIN
+  -- Cuando se asigna un ejecutivo a una conversación,
+  -- sincronizar con prospecto_actual
+  IF NEW.assigned_to IS NOT NULL AND
+     (OLD.assigned_to IS NULL OR OLD.assigned_to != NEW.assigned_to) THEN
+
+    UPDATE prospecto_actual
+    SET
+      assigned_to = NEW.assigned_to,
+      ejecutivo_asignado_at = NOW(),
+      estado = CASE
+        WHEN estado = 'nuevo' THEN 'contactado'
+        ELSE estado
+      END,
+      ultimo_contacto = NOW(),
+      updated_at = NOW()
+    WHERE whatsapp = NEW.prospecto_id;
+
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+alter function sync_conversacion_prospecto() owner to postgres;
+
+create trigger trigger_sync_conversacion_prospecto
+    after update
+    on conversaciones
+    for each row
+execute procedure sync_conversacion_prospecto();
 

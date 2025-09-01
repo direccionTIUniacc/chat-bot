@@ -39,9 +39,23 @@ export const ChatSessionSchema = z.object({
   // Campos para WhatsApp/Chat en tiempo real
   platform: z.enum(['whatsapp', 'web', 'botpress']).default('whatsapp'),
   phone_number: z.string().optional(),
+  contact_name: z.string().optional(),
   last_message_at: z.string(),
   assigned_to: z.string().nullable(), // ID del ejecutivo asignado
   tags: z.array(z.string()).default([]),
+  
+  // 🎯 Campos para handoff inteligente
+  handoff_status: z.enum(['bot', 'queued', 'agent', 'resolved']).default('bot'),
+  handoff_requested_at: z.string().optional(),
+  handoff_accepted_at: z.string().optional(),
+  agent_last_activity: z.string().optional(),
+  priority: z.enum(['low', 'normal', 'high', 'urgent']).default('normal'),
+  notas: z.string().optional(),
+  
+  // Campos para seguimiento
+  message_count: z.number().default(0),
+  unread_count: z.number().default(0),
+  contact_info: z.record(z.string(), z.any()).optional(),
   
   // Campos originales de Botpress
   messages_count: z.number().default(0),

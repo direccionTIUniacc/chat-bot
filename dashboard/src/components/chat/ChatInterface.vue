@@ -115,10 +115,16 @@
                   </span>
                 </div>
 
-                <!-- Ejecutivo asignado -->
-                <div v-if="conversacion.assigned_to" class="flex items-center space-x-1">
-                  <UserCheck class="w-3 h-3 text-green-600" />
-                  <span class="text-xs text-green-600">
+                <!-- Estado de asignación -->
+                <div class="flex items-center space-x-1">
+                  <UserCheck 
+                    :class="conversacion.assigned_to ? 'w-3 h-3 text-green-600' : 'w-3 h-3 text-orange-500'" 
+                  />
+                  <span 
+                    :class="conversacion.assigned_to 
+                      ? 'text-xs text-green-600 bg-green-100 px-2 py-1 rounded-full' 
+                      : 'text-xs text-orange-600 bg-orange-100 px-2 py-1 rounded-full'"
+                  >
                     {{ chat.getEjecutivoNombre(conversacion.assigned_to) }}
                   </span>
                 </div>

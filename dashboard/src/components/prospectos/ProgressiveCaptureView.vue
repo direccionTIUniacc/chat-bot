@@ -139,7 +139,7 @@
           <tbody class="bg-white divide-y divide-gray-200">
             <tr
               v-for="prospecto in prospectosFiltrados"
-              :key="prospecto.id"
+              :key="prospecto.whatsapp || prospecto.id"
               class="hover:bg-gray-50"
             >
               <td class="px-6 py-4 whitespace-nowrap">
@@ -214,6 +214,14 @@
         </div>
       </div>
     </div>
+
+    <!-- Modal de detalle -->
+    <ProspectoDetailModal
+      :show="showDetailModal"
+      :prospecto="selectedProspecto"
+      @close="cerrarModal"
+      @reactivar="reactivarCaptura"
+    />
   </div>
 </template>
 
@@ -227,6 +235,7 @@ import {
   FileText
 } from 'lucide-vue-next'
 import MetricCard from '@/components/common/MetricCard.vue'
+import ProspectoDetailModal from '@/components/prospectos/ProspectoDetailModal.vue'
 import { useProspectos } from '@/composables/useProspectos'
 import { formatDateTime, formatTipoConsulta } from '@/utils/formatters'
 import type { Prospecto } from '@/types'
@@ -253,15 +262,29 @@ const filtros = ref({
   ultimasSemanas: '4'
 })
 
+// Estado del modal
+const showDetailModal = ref(false)
+const selectedProspecto = ref<ProspectoActual | null>(null)
+
 // Computed
 const prospectosFiltrados = computed(() => {
-  let filtered = (prospectos.prospectos.value as ProspectoActual[]).filter(p => 
-    p.tipo_consulta_actual && (
-      p.tipo_consulta_actual.includes('captura') || 
-      p.tipo_consulta_actual.includes('abandono') ||
-      p.tipo_consulta_actual === 'timeout_session'
+  // 🔧 TEMPORAL: Mostrar todos los prospectos hasta que tengamos datos de Progressive Capture
+  let filtered = (prospectos.prospectos.value as ProspectoActual[])
+  
+  // Si hay datos de Progressive Capture, filtrar por ellos
+  if (filtered.some(p => p.tipo_consulta_actual && (
+    p.tipo_consulta_actual.includes('captura') || 
+    p.tipo_consulta_actual.includes('abandono') ||
+    p.tipo_consulta_actual === 'timeout_session'
+  ))) {
+    filtered = filtered.filter(p => 
+      p.tipo_consulta_actual && (
+        p.tipo_consulta_actual.includes('captura') || 
+        p.tipo_consulta_actual.includes('abandono') ||
+        p.tipo_consulta_actual === 'timeout_session'
+      )
     )
-  )
+  }
 
   if (filtros.value.busqueda) {
     const search = filtros.value.busqueda.toLowerCase()
@@ -364,8 +387,15 @@ const getPercentage = (value: number, total: number): string => {
 
 const getTipoConsultaColor = (tipo?: string): string => {
   if (!tipo) return 'bg-gray-100 text-gray-800'
-  // Para compatibilidad con las constantes del dashboard
-  return 'bg-blue-100 text-blue-800' // Color por defecto
+  
+  // Colores específicos para Progressive Capture
+  if (tipo.includes('captura completa')) return 'bg-green-100 text-green-800'
+  if (tipo.includes('captura en proceso')) return 'bg-blue-100 text-blue-800'
+  if (tipo.includes('abandono')) return 'bg-red-100 text-red-800'
+  if (tipo === 'timeout_session') return 'bg-gray-100 text-gray-800'
+  
+  // Color por defecto
+  return 'bg-purple-100 text-purple-800'
 }
 
 const getCamposCapturados = (prospecto: ProspectoActual) => {
@@ -385,13 +415,21 @@ const puedeReactivar = (prospecto: any): boolean => {
 }
 
 const verDetalle = (prospecto: ProspectoActual) => {
-  // Implementar vista de detalle
-  console.log('Ver detalle:', prospecto)
+  selectedProspecto.value = prospecto
+  showDetailModal.value = true
 }
 
 const reactivarCaptura = (prospecto: ProspectoActual) => {
   // Implementar reactivación de captura
   console.log('Reactivar captura:', prospecto)
+  // TODO: Implementar lógica para reactivar captura
+  // Posiblemente enviar una notificación al chatbot
+  showDetailModal.value = false
+}
+
+const cerrarModal = () => {
+  showDetailModal.value = false
+  selectedProspecto.value = null
 }
 
 const limpiarFiltros = () => {

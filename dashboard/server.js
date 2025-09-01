@@ -550,7 +550,6 @@ app.get('/api/prospectos', async (req, res) => {
     }
     
     // Sin filtro de WhatsApp, devolver todos los prospectos directamente de la tabla
-    console.log('🔍 Consultando tabla prospecto_actual directamente...')
     const { data: prospectos, error } = await supabase
       .from('prospecto_actual')
       .select('*')
@@ -560,8 +559,6 @@ app.get('/api/prospectos', async (req, res) => {
       console.error('❌ Error obteniendo prospectos:', error)
       return res.json({ success: true, data: [] })
     }
-
-    console.log('📊 Primeros datos campos:', prospectos?.[0] ? Object.keys(prospectos[0]) : 'Sin datos')
     res.json({ success: true, data: prospectos || [] })
   } catch (error) {
     console.error('💥 Error en /api/prospectos:', error)
